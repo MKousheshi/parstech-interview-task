@@ -1,0 +1,25 @@
+[project]
+name = "consultant-bot"
+version = "0.1.0"
+description = "Add your description here"
+authors = [
+    { name = "Mohammad Kousheshi", email = "kowareta993@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "langchain>=1.4.2",
+    "langchain-openai>=1.6.3",
+    "langgraph>=1.2.12",
+]
+
+[project.scripts]
+consultant-bot = "consultant_bot:main"
+
+[build-system]
+requires = ["uv_build>=0.12.3,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
