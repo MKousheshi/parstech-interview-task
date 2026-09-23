@@ -23,12 +23,15 @@ src/consultant_bot/
   webui.py                 # Gradio RTL web UI (the only front end); one thread_id per browser
                             # session via gr.State
   common/
+    analysis.py             # shared analysis prompt + analysis_messages(entities), used by
+                             # both variants' analysis nodes
     config.py               # OpenAI connection details (via pydantic-settings/.env), model
                              # name/temperature, active search strategy, top_k
     entities.py              # shared Entities model (business_type, customer_type, location, sales_channel),
                              # ENTITY_LABELS, and the is_complete()/summary() helpers every node uses
     llm.py                   # shared build_chat_model() factory used by every LLM-touching node
-    messages.py               # reply_texts(): the AI replies a turn appended, for the web UI
+    messages.py               # reply_texts(): the AI replies a turn appended, for the web UI;
+                              # latest_user_text() for the rigid variant's nodes
     search/
       products.py             # loads + cleans products.json into Product records
       base.py                  # SearchStrategy protocol + ProductHit + shared helpers (product_text,

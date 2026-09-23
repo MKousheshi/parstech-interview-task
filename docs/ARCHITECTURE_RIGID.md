@@ -22,8 +22,12 @@ src/consultant_bot/
   architectures.py         # ARCHITECTURES registry: --arch flexible|rigid -> graph builder
   webui.py                 # Gradio RTL web UI (the only front end)
   common/
+    analysis.py             # shared analysis prompt + analysis_messages(entities), used by
+                             # both variants' analysis nodes
     config.py               # model name/temperature, active search strategy, top_k
-    entities.py              # shared Entities schema (business_type, customer_type, location, sales_channel)
+    entities.py              # shared Entities model (business_type, customer_type, location, sales_channel)
+    llm.py                   # shared build_chat_model() factory
+    messages.py               # reply_texts() for the web UI, latest_user_text() for this variant's nodes
     search/
       products.py             # loads + cleans products.json into Product records
       base.py                  # SearchStrategy protocol + ProductHit + shared helpers (product_text,
