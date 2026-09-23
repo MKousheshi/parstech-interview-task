@@ -66,9 +66,9 @@ def format_hits(hits: Sequence[ProductHit]) -> str:
     """One line per hit — name, price and link.
 
     The single shape used everywhere hits reach an LLM: the `search_products` tool's result, the
-    `suggestion` node's formatting prompt, and the `last_shown_products` block in the assistant's
-    system prompt. Keeping them identical is what lets a follow-up question ("how much was the
-    second one?") be answered from state without re-running search.
+    `suggestion` node's formatting prompt and the retrieval record it leaves in the history.
+    Because every result that reaches the history has name, price and link, a follow-up question
+    ("how much was the second one?") can be answered from it without re-running search.
     """
     return "\n".join(
         f"- {hit.product.name} ({hit.product.price} تومان): {hit.product.permalink}" for hit in hits

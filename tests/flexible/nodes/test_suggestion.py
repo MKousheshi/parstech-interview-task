@@ -1,4 +1,6 @@
-from langchain_core.messages import AIMessage
+from typing import Any
+
+from langchain_core.messages import AIMessage, ToolMessage
 
 from consultant_bot.common.search.base import ProductHit
 from consultant_bot.common.search.products import Product
@@ -39,6 +41,11 @@ def _state() -> State:
     }
 
 
+def _recorded_hits(result: dict[str, Any]) -> list[ProductHit]:
+    [record] = [m for m in result["messages"] if isinstance(m, ToolMessage)]
+    return list(record.artifact)
+
+
 def test_hits_above_threshold_are_formatted_and_shown() -> None:
     hits = [ProductHit(product=_product(1), score=0.5)]
     strategy = FakeSearchStrategy(hits)
@@ -54,9 +61,33 @@ def test_hits_above_threshold_are_formatted_and_shown() -> None:
     result = node(_state())
 
     assert formatter.was_called is True
-    assert result["messages"] == [AIMessage(content="پیشنهاد نهایی")]
-    assert result["last_shown_products"] == hits
+    assert result["messages"][-1] == AIMessage(content="پیشنهاد نهایی")
+    assert _recorded_hits(result) == hits
     assert result["consultation_done"] is True
+
+
+def test_retrieval_is_recorded_as_a_valid_tool_call_pair_before_the_reply() -> None:
+    """Price and link survive in the history even if the formatted prose drops them."""
+    hits = [ProductHit(product=_product(1), score=0.5)]
+    node = build_suggestion_node(
+        ScriptedRunnable(SearchQuery(query="کافه", category="اینستاگرام")),
+        FakeSearchStrategy(hits),
+        ScriptedRunnable(AIMessage(content="پیشنهاد نهایی")),
+        top_k=5,
+        relevance_threshold=0.1,
+    )
+
+    call, record, reply = node(_state())["messages"]
+
+    assert isinstance(call, AIMessage)
+    [tool_call] = call.tool_calls
+    assert tool_call["name"] == "search_products"
+    assert tool_call["args"] == {"query": "کافه", "category": "اینستاگرام"}
+    assert isinstance(record, ToolMessage)
+    assert record.tool_call_id == tool_call["id"]
+    assert "1000000" in record.content
+    assert "https://example.com/1" in record.content
+    assert reply.content == "پیشنهاد نهایی"
 
 
 def test_hits_below_threshold_trigger_honest_fallback_without_calling_formatter() -> None:
@@ -74,12 +105,12 @@ def test_hits_below_threshold_trigger_honest_fallback_without_calling_formatter(
     result = node(_state())
 
     assert formatter.was_called is False
-    assert "متأسفانه" in result["messages"][0].content
-    assert result["last_shown_products"] == []
+    assert "متأسفانه" in result["messages"][-1].content
+    assert _recorded_hits(result) == []
     assert result["consultation_done"] is True
 
 
-def test_no_hits_at_all_still_sets_consultation_done_and_empty_last_shown() -> None:
+def test_no_hits_at_all_still_sets_consultation_done_and_records_an_empty_search() -> None:
     strategy = FakeSearchStrategy([])
     formatter = ScriptedRunnable(AIMessage(content="نباید این صدا زده شود"))
     node = build_suggestion_node(
@@ -93,7 +124,8 @@ def test_no_hits_at_all_still_sets_consultation_done_and_empty_last_shown() -> N
     result = node(_state())
 
     assert formatter.was_called is False
-    assert result["last_shown_products"] == []
+    assert _recorded_hits(result) == []
+    assert result["messages"][1].content == "هیچ محصول مرتبطی یافت نشد."
     assert result["consultation_done"] is True
 
 
@@ -142,4 +174,4 @@ def test_threshold_defaults_to_the_strategys_own_relevance_threshold() -> None:
     result = node(_state())
 
     assert formatter.was_called is False
-    assert result["last_shown_products"] == []
+    assert _recorded_hits(result) == []

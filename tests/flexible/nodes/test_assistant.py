@@ -10,7 +10,6 @@ from consultant_bot.flexible.nodes.assistant import (
     _build_system_prompt,
     build_assistant_node,
     is_complete_but_unrequested_and_unoffered,
-    searched_hits,
 )
 from consultant_bot.flexible.state import State
 from tests.support import COMPLETE_ENTITIES, FIXTURE_PATH, ToolCallingFakeModel
@@ -59,19 +58,20 @@ def test_false_when_already_done() -> None:
     assert is_complete_but_unrequested_and_unoffered(_state(consultation_done=True)) is False
 
 
-def test_prompt_carries_price_and_link_for_the_last_shown_products() -> None:
-    """Follow-ups like "how much is it?" are meant to be answerable without re-running search."""
-    state = _state(last_shown_products=[ProductHit(product=PRODUCT, score=1.0)])
+def test_prompt_carries_no_product_list_of_its_own() -> None:
+    """Earlier results are read from the history, not re-injected into the system prompt."""
+    history = [
+        AIMessage(content="", tool_calls=[_search_call("a", "اینستاگرام")]),
+        ToolMessage(
+            content="- مدیریت پیج اینستاگرام (2500000 تومان): https://example.com/instagram",
+            tool_call_id="a",
+            name="search_products",
+        ),
+    ]
 
-    prompt = _build_system_prompt(state)
+    prompt = _build_system_prompt(_state(messages=history))
 
-    assert "مدیریت پیج اینستاگرام" in prompt
-    assert "2500000" in prompt
-    assert "https://example.com/instagram" in prompt
-
-
-def test_prompt_says_nothing_shown_yet_when_state_is_empty() -> None:
-    assert "(هیچ)" in _build_system_prompt(_state(last_shown_products=None))
+    assert "https://example.com/instagram" not in prompt
 
 
 def _search_call(call_id: str, query: str) -> dict[str, Any]:
@@ -85,15 +85,14 @@ def _run_assistant(scripted: list[AIMessage], **state_overrides: Any) -> dict[st
         **{
             "entities": Entities(),
             "messages": [HumanMessage(content="سلام")],
-            "last_shown_products": None,
             **state_overrides,
         }
     )
     return node(state)
 
 
-def test_parallel_search_calls_in_one_step_merge_into_last_shown_products() -> None:
-    """Compound requests are decomposed into parallel tool calls; they must not collide."""
+def test_parallel_search_results_stay_in_the_history_with_their_hits() -> None:
+    """Compound requests are decomposed into parallel tool calls; each result is kept."""
     result = _run_assistant(
         [
             AIMessage(
@@ -104,26 +103,33 @@ def test_parallel_search_calls_in_one_step_merge_into_last_shown_products() -> N
         ]
     )
 
-    shown_ids = [hit.product.id for hit in result["last_shown_products"]]
-    assert 7569 in shown_ids
-    assert 9177 in shown_ids
-    assert len(shown_ids) == len(set(shown_ids))
+    searches = [m for m in result["messages"] if isinstance(m, ToolMessage)]
+    assert [search.tool_call_id for search in searches] == ["a", "b"]
+    shown_ids = {hit.product.id for search in searches for hit in search.artifact}
+    assert {7569, 9177} <= shown_ids
+    assert set(result) == {"messages"}
 
 
-def test_turn_without_search_leaves_last_shown_products_untouched() -> None:
-    previous = [ProductHit(product=PRODUCT, score=1.0)]
+def test_earlier_search_results_reach_the_model_on_a_later_turn() -> None:
+    """A follow-up about an older result is answerable: the old ToolMessage is still in context."""
+    ToolCallingFakeModel.received = []
+    earlier = [
+        HumanMessage(content="پکیج اینستاگرام دارید؟"),
+        AIMessage(content="", tool_calls=[_search_call("a", "اینستاگرام")]),
+        ToolMessage(
+            content="- مدیریت پیج اینستاگرام (2500000 تومان): https://example.com/instagram",
+            tool_call_id="a",
+            name="search_products",
+            artifact=[ProductHit(product=PRODUCT, score=1.0)],
+        ),
+        AIMessage(content="بله، این پکیج موجود است."),
+        HumanMessage(content="قیمتش چند بود؟"),
+    ]
 
-    result = _run_assistant(
-        [AIMessage(content="قیمتش ۲.۵ میلیون است")], last_shown_products=previous
-    )
+    _run_assistant([AIMessage(content="۲.۵ میلیون تومان")], messages=earlier)
 
-    assert "last_shown_products" not in result
-
-
-def test_searched_hits_is_none_without_a_search_and_empty_for_an_empty_search() -> None:
-    assert searched_hits([AIMessage(content="سلام")]) is None
-    empty_search = ToolMessage(content="", tool_call_id="a", name="search_products", artifact=[])
-    assert searched_hits([empty_search]) == []
+    [call] = ToolCallingFakeModel.received
+    assert any("2500000" in str(message.content) for message in call)
 
 
 def test_every_model_call_gets_a_system_prompt_built_from_current_state() -> None:

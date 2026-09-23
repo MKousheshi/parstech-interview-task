@@ -1,10 +1,9 @@
 """LangChain tool wrapping the active SearchStrategy.
 
 Each call returns the formatted hits as the `ToolMessage` content (what the LLM reads) and the raw
-`ProductHit` list as its artifact. The tool deliberately does *not* write `last_shown_products`
-itself: the assistant is told to issue one call per need, and OpenAI runs those as parallel tool
-calls in a single step, where several writes to the same state key are rejected outright. The
-`assistant` node instead folds every artifact from the turn into one `last_shown_products` update.
+`ProductHit` list as its artifact. The tool writes no state of its own: its `ToolMessage` stays in
+the conversation history, which is what later follow-up questions ("how much was the second one?")
+are answered from.
 """
 
 import logging

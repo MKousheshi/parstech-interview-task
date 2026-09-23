@@ -20,7 +20,6 @@ def _state(**overrides: Any) -> State:
         "consultation_requested": False,
         "consultation_offered": False,
         "consultation_done": False,
-        "last_shown_products": None,
     }
     base.update(overrides)
     return cast(State, base)

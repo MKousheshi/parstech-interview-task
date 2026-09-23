@@ -1,4 +1,4 @@
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
 from consultant_bot.common.search.base import ProductHit
 from consultant_bot.common.search.products import Product
@@ -21,6 +21,16 @@ def test_analysis_call_contains_only_a_system_and_entities_summary_message() -> 
     node = build_analysis_node(fake_llm)
     prior_messages = [
         HumanMessage(content="یک محصول برای مدیریت پیج اینستاگرام میخوام"),
+        AIMessage(
+            content="",
+            tool_calls=[{"name": "search_products", "args": {"query": "اینستاگرام"}, "id": "a"}],
+        ),
+        ToolMessage(
+            content="- مدیریت پیج اینستاگرام (اقتصادی) (1 تومان): https://example.com/1",
+            tool_call_id="a",
+            name="search_products",
+            artifact=[ProductHit(product=SHOWN_PRODUCT, score=1.0)],
+        ),
         AIMessage(content="حتماً، این چند گزینه مناسب است: مدیریت پیج اینستاگرام (اقتصادی)"),
     ]
 
@@ -28,7 +38,6 @@ def test_analysis_call_contains_only_a_system_and_entities_summary_message() -> 
         {
             "messages": prior_messages,
             "entities": COMPLETE_ENTITIES,
-            "last_shown_products": [ProductHit(product=SHOWN_PRODUCT, score=1.0)],
         }
     )
 
@@ -45,7 +54,7 @@ def test_analysis_summary_includes_all_four_entities() -> None:
     fake_llm = ScriptedRunnable(AIMessage(content="تحلیل"))
     node = build_analysis_node(fake_llm)
 
-    node({"messages": [], "entities": COMPLETE_ENTITIES, "last_shown_products": None})
+    node({"messages": [], "entities": COMPLETE_ENTITIES})
 
     summary = fake_llm.inputs[0][1].content
     for value in COMPLETE_ENTITIES.known().values():
@@ -57,7 +66,7 @@ def test_analysis_appends_the_llm_response_and_stores_its_text() -> None:
     fake_llm = ScriptedRunnable(response)
     node = build_analysis_node(fake_llm)
 
-    result = node({"messages": [], "entities": COMPLETE_ENTITIES, "last_shown_products": None})
+    result = node({"messages": [], "entities": COMPLETE_ENTITIES})
 
     assert result["messages"] == [response]
     assert result["analysis"] == "تحلیل نهایی"

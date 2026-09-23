@@ -3,13 +3,12 @@
 import logging
 
 import pytest
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
 
 from consultant_bot.common.checkpoint import build_checkpointer
 from consultant_bot.common.entities import Entities
-from consultant_bot.common.search.base import ProductHit
 from consultant_bot.common.search.filter_search import FilterSearch
 from consultant_bot.common.search.products import load_products
 from consultant_bot.flexible.nodes.assistant import build_assistant_node
@@ -51,5 +50,7 @@ def test_state_types_round_trip_through_the_checkpointer_without_warnings(
 
     assert "unregistered type" not in caplog.text
     assert values["entities"] == Entities(location="تهران")
-    assert isinstance(values["last_shown_products"][0], ProductHit)
-    assert values["last_shown_products"][0].product.id == 7569
+    # The model reads the ToolMessage content on later turns, so it must survive the round-trip.
+    [search] = [m for m in values["messages"] if isinstance(m, ToolMessage)]
+    assert "تلگرام" in search.content
+    assert "تومان" in search.content

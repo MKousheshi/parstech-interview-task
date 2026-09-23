@@ -7,23 +7,24 @@ behavioral spec this implements: answering whatever the user actually said (chat
 follow-up, off-topic), decomposing compound search requests into multiple tool calls, never
 pre-empting the dedicated analysis/suggestion pair, and proactively offering a consultation once
 entities are complete but unrequested and unoffered.
+
+Follow-up questions about earlier results ("how much was the second one?") are answered from the
+conversation history itself: every `search_products` result stays in `messages` as a `ToolMessage`,
+and the `suggestion` node records its own retrieval there the same way. No separate "last shown
+products" slot is kept, so the model isn't steered toward only the latest result set.
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from typing import Any, NotRequired
 
 from langchain.agents import AgentState, create_agent
 from langchain.agents.middleware import ModelRequest, dynamic_prompt
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import BaseMessage, ToolMessage
 
 from consultant_bot.common.entities import Entities
-from consultant_bot.common.search.base import ProductHit, SearchStrategy, format_hits
+from consultant_bot.common.search.base import SearchStrategy
 from consultant_bot.flexible.state import State
-from consultant_bot.flexible.tools.search_products import (
-    SEARCH_PRODUCTS_TOOL_NAME,
-    build_search_products_tool,
-)
+from consultant_bot.flexible.tools.search_products import build_search_products_tool
 
 SYSTEM_PROMPT_TEMPLATE = """\
 تو دستیار فروشگاه محصولات دیجیتال مارکتینگ هستی و دو کار انجام می‌دهی: جست‌وجوی محصول، و کمک به \
@@ -38,10 +39,6 @@ SYSTEM_PROMPT_TEMPLATE = """\
 
 وضعیت مشاوره: درخواست‌شده={consultation_requested}، قبلاً پیشنهادشده={consultation_offered}، \
 قبلاً انجام‌شده={consultation_done}
-
-آخرین محصولات نمایش‌داده‌شده به کاربر — برای پاسخ به سؤالات پیگیری (مثل قیمت یا لینک) مستقیماً از \
-همین فهرست استفاده کن و جست‌وجو را دوباره اجرا نکن:
-{last_shown_products}
 
 دستورالعمل‌های مهم:
 1. اگر کاربر در یک پیام چند نیاز متفاوت مطرح کرد (مثلاً چند دسته محصول جدا)، به‌جای یک فراخوانی \
@@ -77,9 +74,6 @@ def _build_system_prompt(state: State) -> str:
         or "(هنوز هیچ‌کدام)"
     )
     missing = "، ".join(entities.missing_labels()) or "(هیچ)"
-    # Name, price and link — not just names: the follow-up questions this block exists to serve
-    # ("how much is it?", "send me the link") can't be answered from a bare list of names.
-    products_text = format_hits(state.get("last_shown_products") or []) or "(هیچ)"
 
     return SYSTEM_PROMPT_TEMPLATE.format(
         known_entities=known,
@@ -87,35 +81,10 @@ def _build_system_prompt(state: State) -> str:
         consultation_requested=state.get("consultation_requested", False),
         consultation_offered=state.get("consultation_offered", False),
         consultation_done=state.get("consultation_done", False),
-        last_shown_products=products_text,
         proactive_offer_instruction=(
             PROACTIVE_OFFER_INSTRUCTION if is_complete_but_unrequested_and_unoffered(state) else ""
         ),
     )
-
-
-def searched_hits(messages: Sequence[BaseMessage]) -> list[ProductHit] | None:
-    """Every product the `search_products` calls among `messages` returned, deduplicated in order.
-
-    `None` when no search ran, so the caller can leave the previous turn's `last_shown_products`
-    in place for follow-up questions; a search that found nothing yields `[]`, which does replace
-    it.
-    """
-    searches = [
-        message
-        for message in messages
-        if isinstance(message, ToolMessage) and message.name == SEARCH_PRODUCTS_TOOL_NAME
-    ]
-    if not searches:
-        return None
-    hits: list[ProductHit] = []
-    seen_ids: set[int] = set()
-    for search in searches:
-        for hit in search.artifact or []:
-            if hit.product.id not in seen_ids:
-                seen_ids.add(hit.product.id)
-                hits.append(hit)
-    return hits
 
 
 class _AgentLoopState(AgentState[Any]):
@@ -125,7 +94,6 @@ class _AgentLoopState(AgentState[Any]):
     consultation_requested: NotRequired[bool]
     consultation_offered: NotRequired[bool]
     consultation_done: NotRequired[bool]
-    last_shown_products: NotRequired[list[ProductHit] | None]
 
 
 _AGENT_LOOP_KEYS = frozenset(_AgentLoopState.__annotations__)
@@ -154,9 +122,6 @@ def build_assistant_node(
         new_messages = result["messages"][len(state["messages"]) :]
 
         update: dict[str, Any] = {"messages": new_messages}
-        hits = searched_hits(new_messages)
-        if hits is not None:
-            update["last_shown_products"] = hits
         if should_offer:
             update["consultation_offered"] = True
         return update
