@@ -14,6 +14,10 @@ and retry buttons that only edit what the browser shows: the graph's checkpointe
 would keep the undone message, and a retry would send the same message into it a second time. The
 one history control kept is the chatbot's clear button, and clearing starts a new `thread_id`, so
 the bot forgets exactly what the user just watched disappear.
+
+`MemorySaver` keeps every checkpoint of every thread until the process exits, so a thread is
+deleted from it once nothing can reach it any more: when the chat is cleared, and when Gradio
+drops the browser session.
 """
 
 import argparse
@@ -23,6 +27,7 @@ import uuid
 import gradio as gr
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph.state import CompiledStateGraph
 
 from consultant_bot.architectures import ARCHITECTURES
@@ -100,13 +105,22 @@ def add_replies(app: CompiledStateGraph, history: ChatHistory, thread_id: str) -
     return [*history, *({"role": "assistant", "content": reply} for reply in replies)]
 
 
+def start_over(checkpointer: BaseCheckpointSaver, old_thread_id: str) -> tuple[ChatHistory, str]:
+    """What clearing the chat does: forget the old conversation and start a new one."""
+    checkpointer.delete_thread(old_thread_id)
+    return welcome_history(), new_thread_id()
+
+
 def build_demo(arch: str = "flexible") -> gr.Blocks:
-    app = ARCHITECTURES[arch](build_checkpointer())
+    checkpointer = build_checkpointer()
+    app = ARCHITECTURES[arch](checkpointer)
 
     with gr.Blocks(title="دستیار مشاوره کسب‌وکار") as demo:
         gr.Markdown("# دستیار مشاوره کسب‌وکار", rtl=True)
         # A callable value is called on every page load, so each browser session gets its own.
-        thread_id = gr.State(new_thread_id)
+        # Gradio calls `delete_callback` when the session goes away (the tab is closed), which
+        # frees that conversation's checkpoints instead of keeping them until the process exits.
+        thread_id = gr.State(new_thread_id, delete_callback=checkpointer.delete_thread)
         chatbot = gr.Chatbot(rtl=True, label="دستیار مشاوره کسب‌وکار", value=welcome_history)
         textbox = gr.Textbox(
             rtl=True, text_align="right", placeholder="پیام خود را بنویسید...", show_label=False
@@ -115,7 +129,11 @@ def build_demo(arch: str = "flexible") -> gr.Blocks:
         textbox.submit(add_user_message, [textbox, chatbot], [chatbot, textbox], queue=False).then(
             lambda history, tid: add_replies(app, history, tid), [chatbot, thread_id], chatbot
         )
-        chatbot.clear(lambda: (welcome_history(), new_thread_id()), outputs=[chatbot, thread_id])
+        chatbot.clear(
+            lambda tid: start_over(checkpointer, tid),
+            inputs=thread_id,
+            outputs=[chatbot, thread_id],
+        )
 
     return demo  # type: ignore[no-any-return]
 

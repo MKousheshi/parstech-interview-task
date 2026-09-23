@@ -18,6 +18,7 @@ from consultant_bot.webui import (
     NO_REPLY_MESSAGE,
     add_replies,
     add_user_message,
+    start_over,
     turn_replies,
     user_facing_replies,
     welcome_history,
@@ -28,7 +29,7 @@ class _State(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
 
 
-def _build_app() -> Any:
+def _build_app(checkpointer: MemorySaver | None = None) -> Any:
     """A graph whose single turn appends the same shape a consultation-firing turn does."""
 
     def reply(state: _State) -> dict[str, Any]:
@@ -49,7 +50,7 @@ def _build_app() -> Any:
     graph.add_node("reply", reply)
     graph.add_edge(START, "reply")
     graph.add_edge("reply", END)
-    return graph.compile(checkpointer=MemorySaver())
+    return graph.compile(checkpointer=checkpointer or MemorySaver())
 
 
 def test_turn_returns_every_reply_the_turn_appended() -> None:
@@ -127,3 +128,15 @@ def test_no_turn_runs_without_a_new_user_message() -> None:
 
     assert add_replies(app, welcome_history(), "thread-1") == welcome_history()
     assert app.get_state({"configurable": {"thread_id": "thread-1"}}).values == {}
+
+
+def test_clearing_forgets_the_old_conversation_and_starts_a_new_one() -> None:
+    checkpointer = MemorySaver()
+    app = _build_app(checkpointer)
+    turn_replies(app, "old-thread", "سلام")
+
+    history, thread_id = start_over(checkpointer, "old-thread")
+
+    assert history == welcome_history()
+    assert thread_id != "old-thread"
+    assert app.get_state({"configurable": {"thread_id": "old-thread"}}).values == {}
