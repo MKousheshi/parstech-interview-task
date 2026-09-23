@@ -19,7 +19,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import Runnable
 from pydantic import BaseModel, Field
 
-from consultant_bot.common import config
+from consultant_bot.common.config import get_settings
 from consultant_bot.common.entities import ENTITY_FIELDS, Entities
 from consultant_bot.common.llm import build_chat_model
 from consultant_bot.common.search.base import (
@@ -78,11 +78,12 @@ def build_suggestion_node(
     query_formulator: Runnable[Any, SearchQuery],
     strategy: SearchStrategy,
     formatting_llm: LanguageModelLike,
-    top_k: int = config.SEARCH_TOP_K,
+    *,
+    top_k: int,
     relevance_threshold: float | None = None,
 ) -> Callable[[State], dict[str, Any]]:
     threshold = (
-        RELEVANCE_THRESHOLDS[config.SEARCH_STRATEGY]
+        RELEVANCE_THRESHOLDS[get_settings().search_strategy]
         if relevance_threshold is None
         else relevance_threshold
     )

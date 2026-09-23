@@ -8,7 +8,7 @@ Interview take-home task. The **flexible** architecture (see `docs/ARCHITECTURE_
 
 ## Configuration
 
-OpenAI connection details are loaded via `pydantic-settings` from a `.env` file at the repo root (see `src/consultant_bot/common/config.py`). Copy `example.env` to `.env` and fill in `OPENAI_API_KEY` before running the web UI or any LLM-touching test; `OPENAI_BASE_URL` and `OPENAI_MODEL` are optional overrides (defaults: OpenAI's own endpoint, `gpt-4o-mini`).
+All settings (OpenAI connection details, plus the `CONSULTANT_BOT_*` search/LLM knobs) are loaded via `pydantic-settings` from the environment or a `.env` file at the repo root — anchored to the repo, not the current directory (see `src/consultant_bot/common/config.py`; read them via `get_settings()`, not at import time). Copy `example.env` to `.env` and fill in `OPENAI_API_KEY` before running the web UI or any LLM-touching test; `OPENAI_BASE_URL` and `OPENAI_MODEL` are optional overrides (defaults: OpenAI's own endpoint, `gpt-4o-mini`).
 
 ## Commands
 

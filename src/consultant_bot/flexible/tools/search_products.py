@@ -11,7 +11,7 @@ from collections.abc import Callable
 
 from langchain_core.tools import BaseTool, tool
 
-from consultant_bot.common import config
+from consultant_bot.common.config import get_settings
 from consultant_bot.common.search.base import (
     ProductHit,
     SearchStrategy,
@@ -31,9 +31,9 @@ _STRATEGY_BUILDERS: dict[str, Callable[[list[Product]], SearchStrategy]] = {
 
 
 def build_active_strategy() -> SearchStrategy:
-    """Builds the `SearchStrategy` selected by `config.SEARCH_STRATEGY`, over the full catalog."""
+    """Builds the `SearchStrategy` named by `CONSULTANT_BOT_SEARCH_STRATEGY` over the catalog."""
     products = load_products()
-    builder = _STRATEGY_BUILDERS[config.SEARCH_STRATEGY]
+    builder = _STRATEGY_BUILDERS[get_settings().search_strategy]
     return builder(products)
 
 
@@ -42,9 +42,7 @@ SEARCH_PRODUCTS_TOOL_NAME = "search_products"
 NO_HITS_MESSAGE = "هیچ محصول مرتبطی یافت نشد."
 
 
-def build_search_products_tool(
-    strategy: SearchStrategy, top_k: int = config.SEARCH_TOP_K
-) -> BaseTool:
+def build_search_products_tool(strategy: SearchStrategy, *, top_k: int) -> BaseTool:
     """Builds a `search_products` tool bound to a specific `SearchStrategy` instance."""
 
     @tool(SEARCH_PRODUCTS_TOOL_NAME, response_format="content_and_artifact")

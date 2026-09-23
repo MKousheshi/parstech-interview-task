@@ -20,7 +20,6 @@ from langchain_core.messages import BaseMessage, SystemMessage, ToolMessage
 # (still fully functional, just flagged for removal in LangGraph v2.0) rather than losing that.
 from langgraph.prebuilt import create_react_agent
 
-from consultant_bot.common import config
 from consultant_bot.common.entities import Entities
 from consultant_bot.common.search.base import ProductHit, SearchStrategy, format_hits
 from consultant_bot.flexible.state import State
@@ -142,7 +141,7 @@ def _prompt(state: State) -> list[BaseMessage]:
 
 
 def build_assistant_node(
-    llm: LanguageModelLike, search_strategy: SearchStrategy, top_k: int = config.SEARCH_TOP_K
+    llm: LanguageModelLike, search_strategy: SearchStrategy, *, top_k: int
 ) -> Callable[[State], dict[str, Any]]:
     search_tool = build_search_products_tool(search_strategy, top_k=top_k)
     react_agent = create_react_agent(

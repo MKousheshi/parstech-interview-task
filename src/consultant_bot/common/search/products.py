@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from html.parser import HTMLParser
 from pathlib import Path
 
-DEFAULT_PRODUCTS_PATH = Path(__file__).resolve().parents[4] / "products.json"
+from consultant_bot.common.config import get_settings
 
 
 @dataclass(frozen=True)
@@ -53,8 +53,12 @@ def _normalize_product(raw: dict) -> Product:
     )
 
 
-def load_products(path: Path | str = DEFAULT_PRODUCTS_PATH) -> list[Product]:
-    """Loads a WooCommerce product export and normalizes each record into a `Product`."""
-    with Path(path).open(encoding="utf-8") as f:
+def load_products(path: Path | str | None = None) -> list[Product]:
+    """Loads a WooCommerce product export and normalizes each record into a `Product`.
+
+    Defaults to the configured catalog (`CONSULTANT_BOT_PRODUCTS_PATH`, else the project's
+    `products.json`).
+    """
+    with Path(path or get_settings().products_path).open(encoding="utf-8") as f:
         raw_products = json.load(f)
     return [_normalize_product(raw) for raw in raw_products]

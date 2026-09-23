@@ -70,6 +70,7 @@ def test_hits_above_threshold_are_formatted_and_shown() -> None:
         FakeQueryFormulator(SearchQuery(query="کافه")),
         strategy,
         formatter,
+        top_k=5,
         relevance_threshold=0.1,
     )
 
@@ -89,6 +90,7 @@ def test_hits_below_threshold_trigger_honest_fallback_without_calling_formatter(
         FakeQueryFormulator(SearchQuery(query="کافه")),
         strategy,
         formatter,
+        top_k=5,
         relevance_threshold=0.1,
     )
 
@@ -104,7 +106,11 @@ def test_no_hits_at_all_still_sets_consultation_done_and_empty_last_shown() -> N
     strategy = FakeSearchStrategy([])
     formatter = RecordingFakeLLM(AIMessage(content="نباید این صدا زده شود"))
     node = build_suggestion_node(
-        FakeQueryFormulator(SearchQuery(query="کافه")), strategy, formatter, relevance_threshold=0.1
+        FakeQueryFormulator(SearchQuery(query="کافه")),
+        strategy,
+        formatter,
+        top_k=5,
+        relevance_threshold=0.1,
     )
 
     result = node(_state())
@@ -120,6 +126,7 @@ def test_search_is_called_with_the_formulated_query_and_category() -> None:
         FakeQueryFormulator(SearchQuery(query="مدیریت پیج اینستاگرام", category="اینستاگرام")),
         strategy,
         RecordingFakeLLM(AIMessage(content="")),
+        top_k=5,
         relevance_threshold=0.1,
     )
 
@@ -131,7 +138,11 @@ def test_search_is_called_with_the_formulated_query_and_category() -> None:
 def test_query_formulation_reads_the_analysis_field_not_the_last_message() -> None:
     formulator = FakeQueryFormulator(SearchQuery(query="کافه"))
     node = build_suggestion_node(
-        formulator, FakeSearchStrategy([]), RecordingFakeLLM(AIMessage(content="")), 0.1
+        formulator,
+        FakeSearchStrategy([]),
+        RecordingFakeLLM(AIMessage(content="")),
+        top_k=5,
+        relevance_threshold=0.1,
     )
     state = _state()
     state["messages"].append(AIMessage(content="پیام نامرتبط بعدی"))

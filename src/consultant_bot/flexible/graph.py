@@ -9,7 +9,7 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from consultant_bot.common import config
+from consultant_bot.common.config import get_settings
 from consultant_bot.common.llm import build_chat_model
 from consultant_bot.flexible.nodes.analysis import build_analysis_node
 from consultant_bot.flexible.nodes.assistant import build_assistant_node
@@ -28,6 +28,7 @@ def _route_after_assistant(state: State) -> str:
 
 
 def build_graph(checkpointer: BaseCheckpointSaver | None = None) -> CompiledStateGraph:
+    top_k = get_settings().search_top_k
     strategy = build_active_strategy()
 
     graph = StateGraph(State)
@@ -38,12 +39,12 @@ def build_graph(checkpointer: BaseCheckpointSaver | None = None) -> CompiledStat
     )
     graph.add_node(  # type: ignore[call-overload]
         "assistant",
-        build_assistant_node(build_chat_model(), strategy, top_k=config.SEARCH_TOP_K),
+        build_assistant_node(build_chat_model(), strategy, top_k=top_k),
     )
     graph.add_node("analysis", build_analysis_node(build_chat_model()))  # type: ignore[call-overload]
     graph.add_node(  # type: ignore[call-overload]
         "suggestion",
-        build_suggestion_node(build_query_formulator(), strategy, build_chat_model()),
+        build_suggestion_node(build_query_formulator(), strategy, build_chat_model(), top_k=top_k),
     )
 
     graph.add_edge(START, "extract_entities")

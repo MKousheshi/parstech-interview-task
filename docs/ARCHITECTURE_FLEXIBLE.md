@@ -136,7 +136,7 @@ No persistence beyond process lifetime.
 
 ## Configuration
 
-`common/config.py`: `LLM_MODEL` (default `gpt-4o-mini`), `LLM_TEMPERATURE`, `SEARCH_STRATEGY` (`filter`|`tfidf`|`embedding`), `SEARCH_TOP_K`.
+`common/config.py`: a `pydantic-settings` `Settings` model read via `get_settings()`, loaded from the environment or the project-root `.env` — `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL` (default `gpt-4o-mini`), `CONSULTANT_BOT_LLM_TEMPERATURE`, `CONSULTANT_BOT_SEARCH_STRATEGY` (`filter`|`tfidf`|`embedding`, validated at startup), `CONSULTANT_BOT_SEARCH_TOP_K`, `CONSULTANT_BOT_PRODUCTS_PATH` (default: the project's `products.json`).
 
 OpenAI connection details (`OPENAI_API_KEY`, optional `OPENAI_BASE_URL`, optional `OPENAI_MODEL`) are read via `pydantic-settings` from a `.env` file at the repo root (template: `example.env`) or the real environment. `common/llm.py`'s `build_chat_model()` is the single place that consumes them: it only passes `api_key`/`base_url` through to `ChatOpenAI(...)` when set, so an unset `.env` value falls back to `langchain-openai`'s own environment lookup instead of overriding it with `None`.
 
