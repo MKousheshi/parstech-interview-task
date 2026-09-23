@@ -44,7 +44,7 @@ src/consultant_bot/
       product_search.py               # template-formatted search, no LLM
       analysis.py                       # free-knowledge business analysis (no product data)
       suggestion.py                       # deterministic query + grounded LLM formatting
-      fallback.py                          # canned clarifying reply
+      canned.py                            # fallback + idle_reply: fixed canned replies
   flexible/                  # see ARCHITECTURE_FLEXIBLE.md
 tests/
   ...
@@ -53,13 +53,23 @@ tests/
 ## State schema
 
 ```python
+EntityField = Literal["business_type", "customer_type", "location", "sales_channel"]
+Intent = Literal["search", "consultation", "unclear"]
+
+
 class State(TypedDict):
+    # Only `messages` is present from the first turn on; every other field appears once a node
+    # first writes it, so nodes read them with `state.get(...)` (same convention as the flexible
+    # variant's State).
     messages: Annotated[list[BaseMessage], add_messages]
-    entities: Entities                 # total=False: business_type, customer_type, location, sales_channel
-    awaiting_field: str | None          # which entity, if any, the next message will answer
-    consultation_done: bool
-    last_search_results: list[ProductHit] | None
+    entities: NotRequired[Entities]            # the shared, frozen pydantic model; None = unknown
+    awaiting_field: NotRequired[EntityField | None]  # which entity, if any, the next message answers
+    intent: NotRequired[Intent | None]         # route_intent's label for this turn, read by its edge
+    consultation_done: NotRequired[bool]
+    last_search_results: NotRequired[list[ProductHit] | None]
 ```
+
+`awaiting_field` is typed as a `Literal` of the 4 entity field names rather than a bare `str`, so a typo can't create a fifth pending field. There's no `analysis` field (unlike the flexible variant): the rigid `suggestion` builds its search query from the entities alone and never reads the analysis text back.
 
 `awaiting_field` is the core mechanism of this design: it names exactly one of the 4 entity fields, or is `None`. Whenever it's set, the graph skips intent classification entirely and treats the incoming message as the literal answer to that field — including if the message was clearly meant as something else (e.g. "actually, can I search for products instead" while `location` is pending becomes the literal value stored for `location`). This is a deliberate, documented limitation of the rigid design, not an oversight — see "Known limitations" below.
 
@@ -86,16 +96,16 @@ flowchart TD
     suggestion --> ENDe([END])
 ```
 
-- **`route_intent`** — runs only when no field is pending. A single LLM classification call into exactly one of `search` / `consultation` / `unclear`. No tool use, no free-form judgment beyond picking one label.
+- **`route_intent`** — runs only when no field is pending. A single structured-output LLM call (`with_structured_output` over a model with one `Literal["search", "consultation", "unclear"]` field, the same pattern as the flexible variant's extractor) on the latest user message only. The node writes the label to `intent`; a pure routing function on the conditional edge reads it. No tool use, no free-form judgment beyond picking one label.
 - **`capture_entity`** — zero LLM calls: takes the raw reply text, trims it, and stores it verbatim as the value of `awaiting_field`, then clears `awaiting_field`. No confidence check, no re-asking on an ambiguous answer — whatever was typed is the value.
 - **`ask_entity`** — zero LLM calls: looks up the first unset field in the fixed order (`business_type`, `customer_type`, `location`, `sales_channel`) and returns a fixed template question for it, setting `awaiting_field` to that field's name.
-- **`product_search`** — zero LLM calls: passes the raw user message straight to the active `SearchStrategy.search()` as the query (no decomposition of compound requests, no query rewriting for follow-ups) and template-formats the top-`k` hits (name, price, link) into the reply. `last_search_results` is updated for display purposes only — nothing downstream reads it back to resolve a later "what's the price of it?", since that would require the kind of context-dependent interpretation this design deliberately doesn't do outside the entity-capture flow.
+- **`product_search`** — zero LLM calls: passes the raw user message straight to the active `SearchStrategy.search()` as the query (no decomposition of compound requests, no query rewriting for follow-ups) and template-formats the top-`k` hits (name, price, link — the shared `format_hits` lines under a fixed header) into the reply, or a fixed "nothing found" message when there are none. `last_search_results` is updated for display purposes only — nothing downstream reads it back to resolve a later "what's the price of it?", since that would require the kind of context-dependent interpretation this design deliberately doesn't do outside the entity-capture flow.
 - **`analysis`** — same hard requirement as the flexible variant: one LLM call using only the 4 collected entities, no product data, no knowledge base. Since this node is reached only through the fixed graph edges above rather than a shared/tool-bound conversational object, context isolation here falls out of the architecture directly rather than needing an explicit isolation rule.
 - **`suggestion`** — two steps:
   1. **Query construction** — a fixed deterministic template (e.g. joining `business_type` and `sales_channel` into a short string), not an LLM call. Simpler than the flexible variant's LLM-driven query formulation, and correspondingly lower quality when the entities don't map cleanly onto catalog vocabulary.
-  2. **Retrieval + formatting** — one `SearchStrategy.search()` call, `top_k` hits, then one LLM call that formats them into a recommendation grounded in that shortlist (same "don't invent products" instruction as the flexible variant). No relevance threshold — whatever `top_k` returns gets written up, even if none of it is a good match. Sets `consultation_done = True`.
-- **`fallback`** — zero LLM calls: one canned "I didn't quite get that — are you looking to search for products, or start a consultation?" message, regardless of what was actually said.
-- **`idle_reply`** — zero LLM calls: a canned message when `consultation_done` is already `True` and the user's message was classified as wanting to start a consultation again (no support for revisiting or restarting a completed consultation beyond this notice).
+  2. **Retrieval + formatting** — one `SearchStrategy.search()` call, `top_k` hits, then one LLM call that formats them (plus the entity summary, so the write-up addresses this business) into a recommendation grounded in that shortlist (same "don't invent products" instruction as the flexible variant). No relevance threshold — whatever `top_k` returns gets written up, even if none of it is a good match. Only when search returns no hits at all does it skip the LLM call and reply with a fixed "nothing found" message. Sets `consultation_done = True` and `last_search_results` either way.
+- **`fallback`** (in `nodes/canned.py`) — zero LLM calls: one canned "I didn't quite get that — are you looking to search for products, or start a consultation?" message, regardless of what was actually said.
+- **`idle_reply`** (in `nodes/canned.py`) — zero LLM calls: a canned message when `consultation_done` is already `True` and the user's message was classified as wanting to start a consultation again (no support for revisiting or restarting a completed consultation beyond this notice).
 
 ## Product data pipeline
 
