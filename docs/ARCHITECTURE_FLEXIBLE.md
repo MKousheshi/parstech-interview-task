@@ -22,7 +22,8 @@ src/consultant_bot/
   cli.py                   # REPL; --arch flexible|rigid picks which graph to build
   common/
     config.py               # model name/temperature, active search strategy, top_k
-    entities.py              # shared Entities schema (business_type, customer_type, location, sales_channel)
+    entities.py              # shared Entities schema + ENTITY_FIELDS (business_type, customer_type, location, sales_channel)
+    llm.py                   # shared build_chat_model() factory used by every LLM-touching node
     search/
       products.py             # loads + cleans products.json into Product records
       base.py                  # SearchStrategy protocol + ProductHit dataclass
@@ -57,9 +58,12 @@ class State(TypedDict):
     consultation_offered: bool       # the proactive offer has already been made once since entities completed
     consultation_done: bool
     last_shown_products: list[ProductHit] | None
+    remaining_steps: NotRequired[RemainingSteps]  # required by create_react_agent, see below
 ```
 
 `messages` uses LangGraph's `add_messages` reducer so each turn appends rather than overwrites. The free-knowledge analysis text doesn't need its own state field — it's just another `AIMessage` in `messages` once produced.
+
+`remaining_steps` is a LangGraph implementation detail, not part of the conceptual design: `create_react_agent` (used inside `assistant`, below) requires it to be present whenever a custom `state_schema` is passed, since it tracks the ReAct loop's remaining recursion budget internally.
 
 `entities` merges field-by-field on every turn: a newly extracted value for a field replaces the old one (supports correcting earlier answers), fields not mentioned this turn are left untouched (supports collecting across turns in any order). Whenever `extract_entities` changes a field's value while `consultation_done` is `True`, it clears `consultation_done` back to `False`, so a post-suggestion correction ("actually I'm B2B, not B2C") automatically re-triggers a fresh analysis+suggestion on the next completion check instead of leaving stale advice standing.
 
@@ -134,8 +138,11 @@ No persistence beyond process lifetime.
 - **Search strategies** — deterministic, no LLM; unit tests per phase against a fixture product list (shared with the rigid variant).
 - **Entity merge logic** — accumulation across calls, overwrite-on-new-mention, clearing `consultation_done` on a post-completion change, `consultation_requested` staying sticky-`True` once set, `consultation_offered` being set exactly once by plain code when the offer condition is met.
 - **`completion_check`** — trivial plain-function test, covering the new complete-but-unrequested and requested-but-incomplete cases alongside the original all-true/all-false ones.
-- **`assistant` node behavior** (tool-calling, decomposition, follow-ups, off-topic handling, not pre-empting analysis) isn't meaningfully unit-testable without a live/mocked LLM — exercised manually via the CLI demo.
-- **End-to-end** — exercised manually via the CLI demo.
+- **`assistant`'s proactive-offer condition** — extracted as the pure `is_complete_but_unrequested_and_unoffered(state)` function specifically so it's unit-testable in isolation from the tool-calling loop around it.
+- **`analysis`'s context isolation** — a fake LLM that records exactly what messages it was invoked with, asserting the call is always exactly a system message plus a 2-line entities summary, never `state["messages"]` or `last_shown_products`. Turns "isolation is structural" from a design claim into something a test actually checks.
+- **`suggestion`'s threshold/retrieval logic** — a fake `SearchStrategy` and fake formatting LLM, asserting the formatter is never even called when nothing clears the relevance floor (the honest-fallback path), and that `consultation_done`/`last_shown_products` are set in both the found and nothing-found branches.
+- **`assistant` node behavior** (tool-calling, decomposition, follow-ups, off-topic handling, not pre-empting analysis) and the query-formulation/formatting LLM calls inside `suggestion` aren't meaningfully unit-testable without a live/mocked LLM — exercised manually via the CLI demo.
+- **End-to-end** — exercised manually via the CLI demo. (As of this writing, that manual pass is still pending in this environment for lack of an `OPENAI_API_KEY` — see `docs/TODO_FLEXIBLE.md`.)
 
 ## Comparison notes
 

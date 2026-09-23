@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-Early implementation stage for an interview take-home task. Only a minimal LangGraph hello-world scaffold exists so far (`src/consultant_bot/graph.py`); the search and consultation graph described below is not yet built.
+Interview take-home task. The **flexible** architecture (see `docs/ARCHITECTURE_FLEXIBLE.md`) is fully implemented: shared product pipeline, all three search-strategy phases, and the full `extract_entities -> assistant -> completion_check -> (analysis -> suggestion | END)` graph, wired up behind `uv run consultant-bot --arch flexible`. The **rigid** architecture (`docs/ARCHITECTURE_RIGID.md`) has not been started yet — only the flexible variant's checklist (`docs/TODO_FLEXIBLE.md`) has been worked through. Live-LLM manual QA (the CLI demo scenarios called for in the architecture doc) is still pending in whatever environment picks this up next, since no `OPENAI_API_KEY` was available while building the flexible variant.
 
 ## Commands
 
@@ -13,7 +13,7 @@ Package management is via `uv`.
 - Install deps: `uv sync`
 - Run the CLI entry point: `uv run consultant-bot`
 - Run tests: `uv run pytest`
-- Run a single test: `uv run pytest tests/test_graph.py::test_say_hello`
+- Run a single test: `uv run pytest tests/flexible/test_graph.py::test_route_after_assistant_ends_when_not_yet_requested`
 - Add a dependency: `uv add <package>` (dev-only: `uv add --dev <package>`)
 - **Run the full local check pipeline (lint, format check, types, dependency vulnerability scan, tests): `./scripts/check.sh`** — run this before considering any change done. `./scripts/check.sh --fix` auto-applies `ruff check --fix` and `ruff format` first.
 - Lint only: `uv run ruff check .` (add `--fix` to auto-fix)
@@ -28,8 +28,8 @@ Package management is via `uv`.
 - `docs/DECISIONS.md` — the living log of scope/architecture decisions, dated and with rationale + alternatives considered. **This is the source of truth for how the assistant should be built.** Read it before implementing anything — it already answers most "how should this work" questions.
 - `docs/ARCHITECTURE_FLEXIBLE.md` / `docs/ARCHITECTURE_RIGID.md` — implementation-level design for the two chatbot variants being built (see "What's being built" below): module layout, state schema, graph topology, and per-node behavior for each. Read the relevant one before touching `src/consultant_bot/flexible/` or `src/consultant_bot/rigid/`.
 - `products.json` — raw WooCommerce REST API export of the store's product catalog (29 items, Persian-language digital-marketing products/services). `description` and `short_description` are raw HTML and need cleanup before use. Not all WooCommerce fields are relevant (see the "Products data" section of `docs/CLARIFICATIONS.md` for which ones).
-- `src/consultant_bot/` — the Python package (uv-managed, src layout). `graph.py` currently holds a minimal LangGraph hello-world graph; this is where the real graphs will grow, into `common/` (shared product pipeline + search strategies), `flexible/`, and `rigid/` per the architecture docs above.
-- `tests/` — pytest suite.
+- `src/consultant_bot/` — the Python package (uv-managed, src layout): `cli.py` (shared REPL), `common/` (shared product pipeline + search strategies + LLM factory), `flexible/` (fully built), `rigid/` (not yet started) per the architecture docs above.
+- `tests/` — pytest suite, mirroring the `src/` package layout.
 
 ## What's being built (per docs/DECISIONS.md)
 
