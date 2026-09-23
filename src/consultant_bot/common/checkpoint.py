@@ -1,7 +1,7 @@
 """The in-memory checkpointer every architecture's graph is compiled with.
 
 Graph state carries a few of this package's own types (`Entities`, and `ProductHit`/`Product` in
-the rigid variant's `last_search_results`). LangGraph's checkpoint serializer only warns when
+the scripted variant's `last_search_results`). LangGraph's checkpoint serializer only warns when
 deserializing types it wasn't told about today, and will refuse them in a future release, so
 they're registered explicitly here rather than relying on that permissive default.
 """

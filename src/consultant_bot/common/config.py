@@ -1,4 +1,4 @@
-"""Runtime configuration shared by both the flexible and rigid architectures.
+"""Runtime configuration shared by both the agentic and scripted architectures.
 
 Everything is read by `pydantic-settings` from the real environment or a `.env` file at the project
 root (see `example.env` for the template) — anchored to the project, not the current directory, so

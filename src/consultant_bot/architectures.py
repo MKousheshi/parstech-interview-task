@@ -5,12 +5,12 @@ from collections.abc import Callable
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph.state import CompiledStateGraph
 
-from consultant_bot.flexible.graph import build_graph as build_flexible_graph
-from consultant_bot.rigid.graph import build_graph as build_rigid_graph
+from consultant_bot.agentic.graph import build_graph as build_agentic_graph
+from consultant_bot.scripted.graph import build_graph as build_scripted_graph
 
 GraphBuilder = Callable[[BaseCheckpointSaver | None], CompiledStateGraph]
 
 ARCHITECTURES: dict[str, GraphBuilder] = {
-    "flexible": build_flexible_graph,
-    "rigid": build_rigid_graph,
+    "agentic": build_agentic_graph,
+    "scripted": build_scripted_graph,
 }

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-Interview take-home task. The **flexible** architecture (see `docs/ARCHITECTURE_FLEXIBLE.md`) is fully implemented: shared product pipeline, all three search-strategy phases, and the full `extract_entities -> assistant -> completion_check -> (analysis -> suggestion | END)` graph, wired up behind `uv run consultant-bot-web --arch flexible`. The **rigid** architecture (`docs/ARCHITECTURE_RIGID.md`) is fully implemented too: the `route_intent`/`capture_entity`/`ask_entity` state machine with template search and the same analysis -> suggestion pair, behind `--arch rigid`. A live-LLM pass has been run on both variants (see each architecture doc's "Testing approach"). Two flexible scenarios haven't been run live yet: correcting an entity after the suggestion fired, and the proactive consultation offer.
+Interview take-home task. The **agentic** architecture (see `docs/ARCHITECTURE_AGENTIC.md`) is fully implemented: shared product pipeline, all three search-strategy phases, and the full `extract_entities -> assistant -> completion_check -> (analysis -> suggestion | END)` graph, wired up behind `uv run consultant-bot-web --arch agentic`. The **scripted** architecture (`docs/ARCHITECTURE_SCRIPTED.md`) is fully implemented too: the `route_intent`/`capture_entity`/`ask_entity` state machine with template search and the same analysis -> suggestion pair, behind `--arch scripted`. A live-LLM pass has been run on both variants (see each architecture doc's "Testing approach"). Two agentic scenarios haven't been run live yet: correcting an entity after the suggestion fired, and the proactive consultation offer.
 
 ## Configuration
 
@@ -15,9 +15,9 @@ All settings (OpenAI connection details, plus the `CONSULTANT_BOT_*` search/LLM 
 Package management is via `uv`.
 
 - Install deps: `uv sync`
-- Run the Gradio web UI (RTL-aware, for Persian; the only front end): `uv run consultant-bot-web` (`--arch flexible` is the default; `--arch rigid` selects the other variant)
+- Run the Gradio web UI (RTL-aware, for Persian; the only front end): `uv run consultant-bot-web` (`--arch agentic` is the default; `--arch scripted` selects the other variant)
 - Run tests: `uv run pytest`
-- Run a single test: `uv run pytest tests/flexible/test_graph.py::test_route_after_assistant_ends_when_not_yet_requested`
+- Run a single test: `uv run pytest tests/agentic/test_graph.py::test_route_after_assistant_ends_when_not_yet_requested`
 - Add a dependency: `uv add <package>` (dev-only: `uv add --dev <package>`)
 - **Run the full local check pipeline (lint, format check, types, tests): `./scripts/check.sh`** — run this before considering any change done. `./scripts/check.sh --fix` auto-applies `ruff check --fix` and `ruff format` first. The dependency vulnerability scan is opt-in: add `--audit` (combinable with `--fix`) only when a change adds or updates packages.
 - Lint only: `uv run ruff check .` (add `--fix` to auto-fix)
@@ -30,9 +30,9 @@ Package management is via `uv`.
 - `docs/TASK_SPEC.md` — faithful English rendering of the original (Persian) task description. Treat as close to immutable; don't edit it to reflect scope decisions.
 - `docs/CLARIFICATIONS.md` — open questions and observations about the task/data that haven't been resolved into a decision yet. Items move here first, then get resolved into `docs/DECISIONS.md` and removed from this file.
 - `docs/DECISIONS.md` — the living log of scope/architecture decisions, dated and with rationale + alternatives considered. **This is the source of truth for how the assistant should be built.** Read it before implementing anything — it already answers most "how should this work" questions.
-- `docs/ARCHITECTURE_FLEXIBLE.md` / `docs/ARCHITECTURE_RIGID.md` — implementation-level design for the two chatbot variants being built (see "What's being built" below): module layout, state schema, graph topology, and per-node behavior for each. Read the relevant one before touching `src/consultant_bot/flexible/` or `src/consultant_bot/rigid/`.
+- `docs/ARCHITECTURE_AGENTIC.md` / `docs/ARCHITECTURE_SCRIPTED.md` — implementation-level design for the two chatbot variants being built (see "What's being built" below): module layout, state schema, graph topology, and per-node behavior for each. Read the relevant one before touching `src/consultant_bot/agentic/` or `src/consultant_bot/scripted/`.
 - `products.json` — raw WooCommerce REST API export of the store's product catalog (29 items, Persian-language digital-marketing products/services). `description` and `short_description` are raw HTML and need cleanup before use. Not all WooCommerce fields are relevant (see the "Products data" section of `docs/CLARIFICATIONS.md` for which ones).
-- `src/consultant_bot/` — the Python package (uv-managed, src layout): `architectures.py` (`--arch` name -> graph builder registry), `webui.py` (Gradio RTL web UI, the only front end — the CLI was dropped), `common/` (shared product pipeline + search strategies + LLM factory), `flexible/` and `rigid/` (both fully built) per the architecture docs above.
+- `src/consultant_bot/` — the Python package (uv-managed, src layout): `architectures.py` (`--arch` name -> graph builder registry), `webui.py` (Gradio RTL web UI, the only front end — the CLI was dropped), `common/` (shared product pipeline + search strategies + LLM factory), `agentic/` and `scripted/` (both fully built) per the architecture docs above.
 - `tests/` — pytest suite, mirroring the `src/` package layout.
 
 ## What's being built (per docs/DECISIONS.md)
@@ -47,9 +47,9 @@ A chatbot with a Gradio web UI (LangChain + LangGraph, OpenAI as LLM provider) w
    - A small comparison script (`uv run python scripts/compare_search.py`) runs all the strategies side-by-side on realistic Persian queries.
 2. **Business consultation flow**: collects 4 entities (business type, customer type B2B/B2C, geographic location, virtual sales channel) across turns. Once all 4 are present, two separate LLM calls run: an analysis node (free-knowledge business recommendation, no product data in context) followed by a suggestion node (runs product search, then formats suggestions grounded in the retrieved results).
 
-Built as **two parallel chatbot architectures**, not one — see `docs/ARCHITECTURE_FLEXIBLE.md` and `docs/ARCHITECTURE_RIGID.md`:
-   - **Rigid**: a scripted state machine — entities collected one at a time in the spec's literal order, a fixed per-turn intent classifier, deterministic/template handling everywhere the task doesn't explicitly require an LLM call.
-   - **Flexible**: a tool-calling LLM agent — entities extracted/merged opportunistically in any order, one general assistant node handles search/follow-ups/tangents/off-topic input, hardcoded logic reserved only for the parts the task requires without exception.
+Built as **two parallel chatbot architectures**, not one — see `docs/ARCHITECTURE_AGENTIC.md` and `docs/ARCHITECTURE_SCRIPTED.md`:
+   - **Scripted**: a state machine — entities collected one at a time in the spec's literal order, a fixed per-turn intent classifier, deterministic/template handling everywhere the task doesn't explicitly require an LLM call.
+   - **Agentic**: a tool-calling LLM agent — entities extracted/merged opportunistically in any order, one general assistant node handles search/follow-ups/tangents/off-topic input, hardcoded logic reserved only for the parts the task requires without exception.
    - Both share the same product pipeline and pluggable search strategies (`src/consultant_bot/common/`).
 
 Conversation state is in-memory only (LangGraph in-memory checkpointer, no cross-restart persistence). Acceptance bar is a working end-to-end web UI demo, not a test suite.

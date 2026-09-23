@@ -2,7 +2,7 @@
 
 Used by the web UI (`webui.py`) to decide what to show: a single turn can append more than one AI
 message — the assistant's own reply, then the `analysis` and `suggestion` pair when the
-consultation fires — and all of them are part of the answer. The rigid variant's nodes read the
+consultation fires — and all of them are part of the answer. The scripted variant's nodes read the
 user's raw message with `latest_user_text`.
 """
 

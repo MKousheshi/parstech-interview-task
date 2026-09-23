@@ -7,12 +7,12 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
 
+from consultant_bot.agentic.nodes.assistant import build_assistant_node
+from consultant_bot.agentic.state import State
 from consultant_bot.common.checkpoint import build_checkpointer
 from consultant_bot.common.entities import Entities
 from consultant_bot.common.search.filter_search import FilterSearch
 from consultant_bot.common.search.products import load_products
-from consultant_bot.flexible.nodes.assistant import build_assistant_node
-from consultant_bot.flexible.state import State
 from tests.support import FIXTURE_PATH, ToolCallingFakeModel
 
 

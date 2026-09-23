@@ -111,7 +111,7 @@ def start_over(checkpointer: BaseCheckpointSaver, old_thread_id: str) -> tuple[C
     return welcome_history(), new_thread_id()
 
 
-def build_demo(arch: str = "flexible") -> gr.Blocks:
+def build_demo(arch: str = "agentic") -> gr.Blocks:
     checkpointer = build_checkpointer()
     app = ARCHITECTURES[arch](checkpointer)
 
@@ -140,7 +140,7 @@ def build_demo(arch: str = "flexible") -> gr.Blocks:
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="consultant-bot-web")
-    parser.add_argument("--arch", choices=sorted(ARCHITECTURES), default="flexible")
+    parser.add_argument("--arch", choices=sorted(ARCHITECTURES), default="agentic")
     args = parser.parse_args()
     logging.basicConfig(
         level=get_settings().log_level,

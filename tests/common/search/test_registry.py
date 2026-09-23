@@ -21,8 +21,7 @@ def test_build_strategy_returns_the_named_strategy(name: str, expected: type) ->
 def test_building_the_graph_module_does_not_import_sentence_transformers() -> None:
     # A fresh interpreter: in-process, another test module may already have imported it.
     code = (
-        "import sys, consultant_bot.flexible.graph; "
-        "sys.exit('sentence_transformers' in sys.modules)"
+        "import sys, consultant_bot.agentic.graph; sys.exit('sentence_transformers' in sys.modules)"
     )
     result = subprocess.run([sys.executable, "-c", code], check=False)  # noqa: S603
     assert result.returncode == 0
