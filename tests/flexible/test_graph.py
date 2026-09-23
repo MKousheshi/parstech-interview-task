@@ -1,23 +1,39 @@
-from langchain_core.messages import AIMessage, HumanMessage
-from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import END
 
-from consultant_bot.flexible.graph import build_graph
+from consultant_bot.flexible.graph import _route_after_assistant, build_graph
+
+COMPLETE_ENTITIES = {
+    "business_type": "کافه",
+    "customer_type": "B2C",
+    "location": "تهران",
+    "sales_channel": "اینستاگرام",
+}
 
 
-def test_stub_graph_echoes_input() -> None:
+def test_build_graph_wires_all_expected_nodes(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    # Building the graph constructs real ChatOpenAI instances (which validate that *a* key is
+    # present, but never call the API), so a dummy key is enough — no network access happens here.
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-not-a-real-key")
+
     app = build_graph()
-    result = app.invoke({"messages": [HumanMessage(content="hello")]})
-    last_message = result["messages"][-1]
-    assert isinstance(last_message, AIMessage)
-    assert last_message.content == "echo: hello"
+
+    node_names = set(app.get_graph().nodes.keys())
+    assert {"extract_entities", "assistant", "analysis", "suggestion"} <= node_names
 
 
-def test_stub_graph_persists_messages_across_turns_with_checkpointer() -> None:
-    app = build_graph(checkpointer=MemorySaver())
-    config = {"configurable": {"thread_id": "test-thread"}}
+def test_route_after_assistant_goes_to_analysis_when_complete_and_requested() -> None:
+    state = {
+        "entities": COMPLETE_ENTITIES,
+        "consultation_requested": True,
+        "consultation_done": False,
+    }
+    assert _route_after_assistant(state) == "analysis"
 
-    app.invoke({"messages": [HumanMessage(content="first")]}, config=config)
-    result = app.invoke({"messages": [HumanMessage(content="second")]}, config=config)
 
-    contents = [message.content for message in result["messages"]]
-    assert contents == ["first", "echo: first", "second", "echo: second"]
+def test_route_after_assistant_ends_when_not_yet_requested() -> None:
+    state = {
+        "entities": COMPLETE_ENTITIES,
+        "consultation_requested": False,
+        "consultation_done": False,
+    }
+    assert _route_after_assistant(state) == END

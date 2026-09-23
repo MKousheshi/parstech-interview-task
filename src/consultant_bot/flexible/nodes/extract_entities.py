@@ -12,8 +12,8 @@ from langchain_core.messages import SystemMessage
 from langchain_core.runnables import Runnable
 from pydantic import BaseModel, Field
 
-from consultant_bot.common import config
 from consultant_bot.common.entities import ENTITY_FIELDS, Entities
+from consultant_bot.common.llm import build_chat_model
 from consultant_bot.flexible.state import State
 
 # How many recent messages to give the extractor, for pronoun/reference resolution and for
@@ -44,10 +44,7 @@ class ExtractedEntities(BaseModel):
 
 
 def build_default_extractor() -> Runnable[Any, ExtractedEntities]:
-    from langchain_openai import ChatOpenAI
-
-    llm = ChatOpenAI(model=config.LLM_MODEL, temperature=config.LLM_TEMPERATURE)
-    return llm.with_structured_output(ExtractedEntities)  # type: ignore[return-value]
+    return build_chat_model().with_structured_output(ExtractedEntities)  # type: ignore[return-value]
 
 
 def build_extract_entities_node(

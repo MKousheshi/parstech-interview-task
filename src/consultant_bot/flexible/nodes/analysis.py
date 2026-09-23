@@ -14,7 +14,6 @@ from typing import Any
 from langchain_core.language_models import LanguageModelLike
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from consultant_bot.common import config
 from consultant_bot.common.entities import ENTITY_FIELDS, Entities
 from consultant_bot.flexible.state import State
 
@@ -38,12 +37,6 @@ def _entities_summary(entities: Entities) -> str:
         f"- {ENTITY_LABELS[field]}: {entities[field]}"  # type: ignore[literal-required]
         for field in ENTITY_FIELDS
     )
-
-
-def build_default_llm() -> LanguageModelLike:
-    from langchain_openai import ChatOpenAI
-
-    return ChatOpenAI(model=config.LLM_MODEL, temperature=config.LLM_TEMPERATURE)
 
 
 def build_analysis_node(llm: LanguageModelLike) -> Callable[[State], dict[str, Any]]:

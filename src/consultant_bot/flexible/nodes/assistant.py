@@ -13,6 +13,11 @@ from typing import Any
 
 from langchain_core.language_models import LanguageModelLike
 from langchain_core.messages import BaseMessage, SystemMessage
+
+# Deprecated in favor of langchain.agents.create_agent, but that replacement only takes a static
+# system_prompt (str/SystemMessage) rather than a per-invocation callable — this node needs the
+# dynamic prompt to reflect current entity/consultation state each turn, so sticking with this
+# (still fully functional, just flagged for removal in LangGraph v2.0) rather than losing that.
 from langgraph.prebuilt import create_react_agent
 
 from consultant_bot.common import config
@@ -107,12 +112,6 @@ def _build_system_prompt(state: State) -> str:
 
 def _prompt(state: State) -> list[BaseMessage]:
     return [SystemMessage(content=_build_system_prompt(state)), *state["messages"]]
-
-
-def build_default_llm() -> LanguageModelLike:
-    from langchain_openai import ChatOpenAI
-
-    return ChatOpenAI(model=config.LLM_MODEL, temperature=config.LLM_TEMPERATURE)
 
 
 def build_assistant_node(

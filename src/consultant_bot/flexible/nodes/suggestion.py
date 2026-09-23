@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 
 from consultant_bot.common import config
 from consultant_bot.common.entities import ENTITY_FIELDS, Entities
+from consultant_bot.common.llm import build_chat_model
 from consultant_bot.common.search.base import ProductHit, SearchStrategy
 from consultant_bot.flexible.state import State
 
@@ -71,17 +72,8 @@ def _format_hits_for_prompt(hits: list[ProductHit]) -> str:
     )
 
 
-def build_default_llm() -> LanguageModelLike:
-    from langchain_openai import ChatOpenAI
-
-    return ChatOpenAI(model=config.LLM_MODEL, temperature=config.LLM_TEMPERATURE)
-
-
 def build_query_formulator() -> Runnable[Any, SearchQuery]:
-    from langchain_openai import ChatOpenAI
-
-    llm = ChatOpenAI(model=config.LLM_MODEL, temperature=config.LLM_TEMPERATURE)
-    return llm.with_structured_output(SearchQuery)  # type: ignore[return-value]
+    return build_chat_model().with_structured_output(SearchQuery)  # type: ignore[return-value]
 
 
 def build_suggestion_node(
