@@ -1,13 +1,14 @@
 """Side-by-side comparison of the three search strategies against realistic Persian queries.
 
 Run manually to sanity-check relevance across phases:
-`uv run python -m consultant_bot.common.search.eval`
+`uv run python scripts/compare_search.py`
 """
 
+from consultant_bot.common.config import SearchStrategyName
 from consultant_bot.common.search.base import ProductHit, SearchStrategy
-from consultant_bot.common.search.filter_search import FilterSearch
+from consultant_bot.common.search.embedding_search import is_model_cached
 from consultant_bot.common.search.products import load_products
-from consultant_bot.common.search.tfidf_search import TfidfSearch
+from consultant_bot.common.search.registry import build_strategy
 
 QUERIES = [
     "مدیریت پیج اینستاگرام",
@@ -32,19 +33,15 @@ def _print_hits(hits: list[ProductHit]) -> None:
 
 def main() -> None:
     products = load_products()
-    strategies: dict[str, SearchStrategy] = {
-        "filter": FilterSearch(products),
-        "tfidf": TfidfSearch(products),
-    }
-    from consultant_bot.common.search.embedding_search import EmbeddingSearch, is_model_cached
-
+    names: list[SearchStrategyName] = ["filter", "tfidf"]
     if is_model_cached():
-        strategies["embedding"] = EmbeddingSearch(products)
+        names.append("embedding")
     else:
         print(
             "(skipping embedding strategy: model not cached locally — run once with network "
             "access to download and cache it)\n"
         )
+    strategies: dict[str, SearchStrategy] = {name: build_strategy(name, products) for name in names}
 
     for query in QUERIES:
         print(f"=== query: {query!r} ===")

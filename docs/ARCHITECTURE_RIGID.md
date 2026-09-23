@@ -33,7 +33,6 @@ src/consultant_bot/
       filter_search.py          # Phase 1: keyword/substring + category filter
       tfidf_search.py            # Phase 2: TF-IDF + cosine similarity
       embedding_search.py         # Phase 3: sentence-transformers semantic search
-      eval.py                      # side-by-side comparison script across strategies
   rigid/
     __init__.py
     graph.py                 # builds and wires this variant's StateGraph
@@ -116,7 +115,7 @@ class ProductHit:
     score: float
 ```
 
-Same three phases as the flexible variant (filter/keyword, TF-IDF, embeddings), same protocol, same `config.py` selection, same `common/search/eval.py` comparison script — this part of the system doesn't differ between architectures.
+Same three phases as the flexible variant (filter/keyword, TF-IDF, embeddings), same protocol, same `config.py` selection, same `scripts/compare_search.py` comparison script — this part of the system doesn't differ between architectures.
 
 ## Web UI / session model
 

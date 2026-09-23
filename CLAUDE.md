@@ -22,7 +22,7 @@ Package management is via `uv`.
 - **Run the full local check pipeline (lint, format check, types, dependency vulnerability scan, tests): `./scripts/check.sh`** — run this before considering any change done. `./scripts/check.sh --fix` auto-applies `ruff check --fix` and `ruff format` first.
 - Lint only: `uv run ruff check .` (add `--fix` to auto-fix)
 - Format only: `uv run ruff format .` (add `--check` to check without writing)
-- Type-check only: `uv run mypy` (checks `src` and `tests`, per `pyproject.toml`)
+- Type-check only: `uv run mypy` (checks `src`, `tests` and `scripts`, per `pyproject.toml`)
 - Dependency vulnerability scan only: `uv run pip-audit`
 
 ## Repository map
@@ -43,7 +43,7 @@ A chatbot with a Gradio web UI (LangChain + LangGraph, OpenAI as LLM provider) w
    - Phase 1: filter/keyword search (substring match on name/description/category + explicit category filter).
    - Phase 2: TF-IDF similarity search (`scikit-learn` `TfidfVectorizer` + cosine similarity, category folded into the text corpus).
    - Phase 3: embedding/semantic search (local multilingual `sentence-transformers` model — not yet pinned).
-   - A small eval script compares all three strategies side-by-side on realistic Persian queries.
+   - A small comparison script (`uv run python scripts/compare_search.py`) runs all three strategies side-by-side on realistic Persian queries.
 2. **Business consultation flow**: collects 4 entities (business type, customer type B2B/B2C, geographic location, virtual sales channel) across turns. Once all 4 are present, two separate LLM calls run: an analysis node (free-knowledge business recommendation, no product data in context) followed by a suggestion node (runs product search, then formats suggestions grounded in the retrieved results).
 
 Built as **two parallel chatbot architectures**, not one — see `docs/ARCHITECTURE_FLEXIBLE.md` and `docs/ARCHITECTURE_RIGID.md`:

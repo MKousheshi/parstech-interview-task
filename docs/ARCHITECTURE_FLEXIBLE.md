@@ -38,7 +38,6 @@ src/consultant_bot/
       filter_search.py          # Phase 1: keyword/substring + category filter
       tfidf_search.py            # Phase 2: TF-IDF + cosine similarity
       embedding_search.py         # Phase 3: sentence-transformers semantic search
-      eval.py                      # side-by-side comparison script across strategies
   flexible/
     __init__.py
     graph.py                 # builds and wires this variant's StateGraph
@@ -60,13 +59,14 @@ tests/
 
 ```python
 class State(TypedDict):
+    # Only `messages` exists from the first turn; the rest appear once a node first writes them.
     messages: Annotated[list[BaseMessage], add_messages]
-    entities: Entities              # frozen pydantic model: business_type, customer_type, location, sales_channel (None = unknown)
-    consultation_requested: bool     # user has explicitly asked for / agreed to a consultation
-    consultation_offered: bool       # the proactive offer has already been made once since entities completed
-    consultation_done: bool
-    last_shown_products: list[ProductHit] | None
-    analysis: str | None             # latest analysis text, written by `analysis`, read by `suggestion`
+    entities: NotRequired[Entities]              # frozen pydantic model: business_type, customer_type, location, sales_channel (None = unknown)
+    consultation_requested: NotRequired[bool]     # user has explicitly asked for / agreed to a consultation
+    consultation_offered: NotRequired[bool]       # the proactive offer has already been made once since entities completed
+    consultation_done: NotRequired[bool]
+    last_shown_products: NotRequired[list[ProductHit] | None]
+    analysis: NotRequired[str | None]             # latest analysis text, written by `analysis`, read by `suggestion`
 ```
 
 `messages` uses LangGraph's `add_messages` reducer so each turn appends rather than overwrites. The free-knowledge analysis is appended to `messages` like any reply, and its text is also stored in its own `analysis` field, which is what `suggestion` reads — so `suggestion` doesn't depend on the analysis happening to be the last message.
@@ -129,7 +129,7 @@ class ProductHit:
     score: float
 ```
 
-Three interchangeable implementations (filter/keyword, TF-IDF, embeddings — see `ARCHITECTURE_RIGID.md` for the per-phase detail, identical here) live behind this protocol. `config.py` names the active one and `common/search/registry.py` builds it (importing the embedding strategy — and with it `sentence-transformers`/`torch` — only when that's the one selected); `flexible/tools/search_products.py` wraps it as a LangChain tool that returns its hits as the `ToolMessage` artifact, which the `assistant` node folds into `state.last_shown_products`. `common/search/eval.py` runs a fixed set of realistic Persian queries — including a compound/multi-facet one issued as a single call, to show how each phase's single-query-vector ranking degrades on it standalone — against every implemented strategy side by side.
+Three interchangeable implementations (filter/keyword, TF-IDF, embeddings — see `ARCHITECTURE_RIGID.md` for the per-phase detail, identical here) live behind this protocol. `config.py` names the active one and `common/search/registry.py` builds it (importing the embedding strategy — and with it `sentence-transformers`/`torch` — only when that's the one selected); `flexible/tools/search_products.py` wraps it as a LangChain tool that returns its hits as the `ToolMessage` artifact, which the `assistant` node folds into `state.last_shown_products`. `scripts/compare_search.py` (outside the package — it's a dev tool, not runtime code) runs a fixed set of realistic Persian queries — including a compound/multi-facet one issued as a single call, to show how each phase's single-query-vector ranking degrades on it standalone — against every implemented strategy side by side.
 
 ## Web UI / session model
 
