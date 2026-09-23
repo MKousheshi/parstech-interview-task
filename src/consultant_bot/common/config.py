@@ -14,7 +14,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -27,7 +27,8 @@ class Settings(BaseSettings):
         env_file=PROJECT_ROOT / ".env", env_file_encoding="utf-8", extra="ignore"
     )
 
-    openai_api_key: str | None = None
+    # SecretStr keeps the key out of `repr(settings)` and so out of any log or traceback.
+    openai_api_key: SecretStr | None = None
     openai_base_url: str | None = None
     openai_model: str = "gpt-4o-mini"
     llm_temperature: float = Field(default=0.3, validation_alias="CONSULTANT_BOT_LLM_TEMPERATURE")

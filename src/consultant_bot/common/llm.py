@@ -21,7 +21,7 @@ def build_chat_model() -> ChatOpenAI:
         "timeout": settings.llm_timeout_seconds,
         "max_retries": settings.llm_max_retries,
     }
-    if settings.openai_api_key:
+    if settings.openai_api_key and settings.openai_api_key.get_secret_value():
         kwargs["api_key"] = settings.openai_api_key
     if settings.openai_base_url:
         kwargs["base_url"] = settings.openai_base_url

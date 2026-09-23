@@ -30,3 +30,13 @@ def test_prefixed_env_vars_are_read(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert settings.search_strategy == "tfidf"
     assert settings.search_top_k == 3
+
+
+def test_api_key_is_hidden_from_the_settings_repr(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-very-secret")
+
+    settings = Settings()
+
+    assert "sk-very-secret" not in repr(settings)
+    assert settings.openai_api_key is not None
+    assert settings.openai_api_key.get_secret_value() == "sk-very-secret"
