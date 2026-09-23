@@ -1,4 +1,19 @@
-from consultant_bot.flexible.nodes.assistant import is_complete_but_unrequested_and_unoffered
+from consultant_bot.common.search.base import ProductHit
+from consultant_bot.common.search.products import Product
+from consultant_bot.flexible.nodes.assistant import (
+    _build_system_prompt,
+    is_complete_but_unrequested_and_unoffered,
+)
+
+PRODUCT = Product(
+    id=1,
+    name="مدیریت پیج اینستاگرام",
+    description="",
+    short_description="",
+    categories=["اینستاگرام"],
+    price="2500000",
+    permalink="https://example.com/instagram",
+)
 
 COMPLETE_ENTITIES = {
     "business_type": "کافه",
@@ -39,3 +54,18 @@ def test_false_when_already_offered() -> None:
 
 def test_false_when_already_done() -> None:
     assert is_complete_but_unrequested_and_unoffered(_state(consultation_done=True)) is False
+
+
+def test_prompt_carries_price_and_link_for_the_last_shown_products() -> None:
+    """Follow-ups like "how much is it?" are meant to be answerable without re-running search."""
+    state = _state(last_shown_products=[ProductHit(product=PRODUCT, score=1.0)])
+
+    prompt = _build_system_prompt(state)
+
+    assert "مدیریت پیج اینستاگرام" in prompt
+    assert "2500000" in prompt
+    assert "https://example.com/instagram" in prompt
+
+
+def test_prompt_says_nothing_shown_yet_when_state_is_empty() -> None:
+    assert "(هیچ)" in _build_system_prompt(_state(last_shown_products=None))

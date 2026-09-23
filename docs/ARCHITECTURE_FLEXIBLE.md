@@ -20,13 +20,17 @@ Both architectures reuse the same product data pipeline and pluggable search str
 src/consultant_bot/
   __init__.py
   cli.py                   # REPL; --arch flexible|rigid picks which graph to build
+  webui.py                 # Gradio RTL web UI; same ARCHITECTURES graph builders as the CLI,
+                            # one thread_id per browser session via gr.State
   common/
-    config.py               # model name/temperature, active search strategy, top_k
+    config.py               # OpenAI connection details (via pydantic-settings/.env), model
+                             # name/temperature, active search strategy, top_k
     entities.py              # shared Entities schema + ENTITY_FIELDS (business_type, customer_type, location, sales_channel)
     llm.py                   # shared build_chat_model() factory used by every LLM-touching node
+    messages.py               # reply_texts(): the AI replies a turn appended, for both front ends
     search/
       products.py             # loads + cleans products.json into Product records
-      base.py                  # SearchStrategy protocol + ProductHit dataclass
+      base.py                  # SearchStrategy protocol + ProductHit dataclass + format_hits()
       filter_search.py          # Phase 1: keyword/substring + category filter
       tfidf_search.py            # Phase 2: TF-IDF + cosine similarity
       embedding_search.py         # Phase 3: sentence-transformers semantic search
@@ -67,7 +71,7 @@ class State(TypedDict):
 
 `entities` merges field-by-field on every turn: a newly extracted value for a field replaces the old one (supports correcting earlier answers), fields not mentioned this turn are left untouched (supports collecting across turns in any order). Whenever `extract_entities` changes a field's value while `consultation_done` is `True`, it clears `consultation_done` back to `False`, so a post-suggestion correction ("actually I'm B2B, not B2C") automatically re-triggers a fresh analysis+suggestion on the next completion check instead of leaving stale advice standing.
 
-`last_shown_products` is written by the `search_products` tool (and by `suggestion`) so follow-up turns ("what's the price of it?") can be answered directly from state instead of re-running search on an under-specified query.
+`last_shown_products` is written by the `search_products` tool (and by `suggestion`) so follow-up turns ("what's the price of it?") can be answered directly from state instead of re-running search on an under-specified query. It reaches the assistant's system prompt through the same `common/search/base.py:format_hits()` used for the tool's own result and the `suggestion` node's formatting prompt — name, price and link per hit, not just names, since a name-only list can't actually answer the follow-ups this field exists for.
 
 `consultation_requested` is set `True` by `extract_entities` when the latest message (read with recent context) is an explicit ask for business advice/recommendations, or an affirmative reply to the assistant's own consultation offer — never set back to `False` once `True`, since a user who has entered the consultation flow shouldn't have to re-ask after a correction or a tangent. As with all context-dependent extraction in this design, an affirmative reply that arrives long after the offer, or amid an unrelated tangent, isn't guaranteed to resolve correctly — an accepted limitation, not a structural guarantee. `consultation_offered` exists purely to stop the assistant from repeating its proactive offer every turn once entities are complete and unrequested; it's set once, deterministically (by plain code, not an LLM judgment call) the first time the offer is actually delivered, and is never consulted again once `consultation_requested` becomes `True`.
 
@@ -79,14 +83,16 @@ flowchart TD
     extract --> assistant[assistant: ReAct loop]
     assistant -->|tool call| search[search_products tool]
     search --> assistant
-    assistant --> gate{completion_check}
+    assistant -.->|conditional edge, routes on completion_check| gate{completion_check}
     gate -->|4 entities, requested, not yet consulted| analysis[analysis]
     gate -->|otherwise| END1([END])
     analysis --> suggestion[suggestion]
     suggestion --> END2([END])
 ```
 
-- **`extract_entities`** — unconditional structured-output LLM call (Pydantic schema matching `Entities`, all fields optional) against the latest user message plus recent context for pronoun/reference resolution. Only fills a field from an explicit, confident statement — a vague or non-committal reply ("not sure", "doesn't matter") is left unset rather than recorded, so `completion_check`'s presence test stays meaningful rather than being satisfiable by a non-answer. Merges into `state.entities` per the overwrite-on-new-mention rule above. Runs before the assistant replies so the assistant always sees up-to-date entity state, including anything just corrected.
+`completion_check` is not a graph node — there's no `graph.add_node("completion_check", ...)`. It's a plain function called from the routing callback passed to `graph.add_conditional_edges("assistant", ...)`, so the diagram's `gate` box represents a decision made on the "assistant" -> next edge, not a step the state passes through.
+
+- **`extract_entities`** — unconditional structured-output LLM call (Pydantic schema matching `Entities`, all fields optional) against the latest user message plus recent context for pronoun/reference resolution. That context is the last N *conversational* messages — human turns and the assistant's textual replies — with the ReAct loop's tool traffic (`AIMessage(tool_calls=...)`/`ToolMessage` pairs) filtered out before the window is taken. Windowing the raw history instead would eventually start the window on a `ToolMessage` whose originating tool call fell outside it, which OpenAI rejects outright; tool traffic carries no entity information anyway. Only fills a field from an explicit, confident statement — a vague or non-committal reply ("not sure", "doesn't matter") is left unset rather than recorded, so `completion_check`'s presence test stays meaningful rather than being satisfiable by a non-answer. Merges into `state.entities` per the overwrite-on-new-mention rule above. Runs before the assistant replies so the assistant always sees up-to-date entity state, including anything just corrected.
 - **`assistant`** — the conversational core: a tool-calling LLM node (LangGraph's prebuilt ReAct-style loop) with `search_products` as its only tool. Its system prompt is given the current entities and what's still missing, `consultation_requested`, `consultation_offered`, `consultation_done`, and `last_shown_products`. It replies to whatever the user actually said — general chat, a product query (calls the tool), a follow-up about a prior result (answers from `last_shown_products` already in context, no tool call needed), or an off-topic/unexpected message (answers helpfully and redirects if it fits naturally) — and may weave in a light prompt for a missing entity when appropriate, without that being forced or exclusive of answering what was actually asked.
   - **Compound requests** ("what products can I use for X, Y, and Z?") are explicitly called out in the system prompt: `search_products` takes one focused query at a time, and every strategy behind it ranks against a single combined query vector/string, so handing it the whole compound sentence in one call risks the facets that dominate the combined query crowding out the others from `top_k`. The prompt instructs decomposing a multi-part request into one `search_products` call per distinct need (optionally with `category` per facet) and synthesizing the results in the reply.
   - **Offers a consultation when entities are complete but unrequested.** If all 4 entities are present, `consultation_requested` is still `False`, `consultation_done` is `False`, and `consultation_offered` is also still `False`, the node's system prompt includes an explicit directive to proactively offer to run the analysis and product suggestion this turn, woven into whatever else it says. After the call, plain code (not the LLM) sets `consultation_offered = True` whenever that condition held this turn — so the offer is made exactly once per completion, not repeated on every subsequent turn while the user does something else. If the user accepts (or asks for it unprompted, in the same or a later turn), `extract_entities` picks that up as `consultation_requested = True` on its next pass and `completion_check` fires normally; if the user ignores or declines, the assistant simply stops mentioning it and answers normally, ready to fire immediately the moment interest is expressed.
@@ -127,16 +133,23 @@ Three interchangeable implementations (filter/keyword, TF-IDF, embeddings — se
 2. Generate one `thread_id` for the process lifetime.
 3. Loop: read a line from stdin → `graph.invoke(...)` → print the newly appended AI message(s) (there may be more than one per turn, per the immediate analysis+suggestion firing above) → repeat until EOF/`exit`.
 
+Both front ends select what to show through the shared `common/messages.py:reply_texts()`, so they display the same thing: *every* AI message the turn appended, in order, minus the ReAct loop's intermediate tool-call messages (which carry no text and would render as blank turns). Showing only the last message would silently drop the business analysis on the turn the consultation fires — the analysis is a required output in its own right, not a preamble to the suggestion.
+
 No persistence beyond process lifetime.
+
+`webui.py` is a second front end over the same `ARCHITECTURES` graph builders (Gradio, RTL-enabled for Persian): one graph is built once per process with a single shared `MemorySaver`, and instead of one `thread_id` for the process lifetime it mints a fresh `thread_id` per browser session (via `gr.State` on `demo.load`), so concurrent visitors get isolated conversations without a real database. Its `Chatbot` is seeded with a static welcome message shown on load, which never goes through the graph and isn't recorded in any thread's conversation state. Where the CLI tracks the prior message count in a local variable, `turn_replies()` reads it back from the thread's own checkpointed state before invoking, so the "what did this turn append" slice stays correct across concurrent sessions sharing the process; Gradio renders the returned list as one bubble per reply.
 
 ## Configuration
 
-`common/config.py`: `LLM_MODEL` (default `gpt-4o-mini`), `LLM_TEMPERATURE`, `SEARCH_STRATEGY` (`filter`|`tfidf`|`embedding`), `SEARCH_TOP_K`. `OPENAI_API_KEY` via environment, consumed by `langchain-openai` directly.
+`common/config.py`: `LLM_MODEL` (default `gpt-4o-mini`), `LLM_TEMPERATURE`, `SEARCH_STRATEGY` (`filter`|`tfidf`|`embedding`), `SEARCH_TOP_K`.
+
+OpenAI connection details (`OPENAI_API_KEY`, optional `OPENAI_BASE_URL`, optional `OPENAI_MODEL`) are read via `pydantic-settings` from a `.env` file at the repo root (template: `example.env`) or the real environment. `common/llm.py`'s `build_chat_model()` is the single place that consumes them: it only passes `api_key`/`base_url` through to `ChatOpenAI(...)` when set, so an unset `.env` value falls back to `langchain-openai`'s own environment lookup instead of overriding it with `None`.
 
 ## Testing approach
 
 - **Search strategies** — deterministic, no LLM; unit tests per phase against a fixture product list (shared with the rigid variant).
-- **Entity merge logic** — accumulation across calls, overwrite-on-new-mention, clearing `consultation_done` on a post-completion change, `consultation_requested` staying sticky-`True` once set, `consultation_offered` being set exactly once by plain code when the offer condition is met.
+- **Entity merge logic** — accumulation across calls, overwrite-on-new-mention, clearing `consultation_done` on a post-completion change, `consultation_requested` staying sticky-`True` once set, `consultation_offered` being set exactly once by plain code when the offer condition is met. `recent_context()`'s tool-traffic filtering is covered separately, asserting the window can never open on an orphaned `ToolMessage`.
+- **Front-end reply selection** — `reply_texts()` over a turn's appended messages (all AI replies in order, tool-call stubs and `ToolMessage`s skipped), and `webui.turn_replies()` against a real compiled graph plus `MemorySaver`, checking the per-turn slice is taken from the thread's own checkpointed state and stays isolated between threads.
 - **`completion_check`** — trivial plain-function test, covering the new complete-but-unrequested and requested-but-incomplete cases alongside the original all-true/all-false ones.
 - **`assistant`'s proactive-offer condition** — extracted as the pure `is_complete_but_unrequested_and_unoffered(state)` function specifically so it's unit-testable in isolation from the tool-calling loop around it.
 - **`analysis`'s context isolation** — a fake LLM that records exactly what messages it was invoked with, asserting the call is always exactly a system message plus a 2-line entities summary, never `state["messages"]` or `last_shown_products`. Turns "isolation is structural" from a design claim into something a test actually checks.

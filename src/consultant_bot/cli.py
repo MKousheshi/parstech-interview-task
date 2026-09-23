@@ -10,12 +10,13 @@ import sys
 import uuid
 from collections.abc import Callable
 
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph.state import CompiledStateGraph
 
+from consultant_bot.common.messages import reply_texts
 from consultant_bot.flexible.graph import build_graph as build_flexible_graph
 
 GraphBuilder = Callable[[BaseCheckpointSaver | None], CompiledStateGraph]
@@ -38,9 +39,8 @@ def run(arch: str) -> None:
         result = app.invoke({"messages": [HumanMessage(content=text)]}, config=config)
         new_messages = result["messages"][previous_count:]
         previous_count = len(result["messages"])
-        for message in new_messages:
-            if isinstance(message, AIMessage):
-                print(message.content)
+        for reply in reply_texts(new_messages):
+            print(reply)
 
 
 def main() -> None:

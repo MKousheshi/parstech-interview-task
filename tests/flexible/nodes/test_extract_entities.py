@@ -1,8 +1,10 @@
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from consultant_bot.flexible.nodes.extract_entities import (
+    RECENT_MESSAGES_WINDOW,
     ExtractedEntities,
     build_extract_entities_node,
+    recent_context,
 )
 
 
@@ -27,6 +29,35 @@ def _state(**overrides):  # type: ignore[no-untyped-def]
     }
     base.update(overrides)
     return base
+
+
+def _react_turn(index: int) -> list:  # type: ignore[type-arg]
+    """One turn's worth of history as the assistant's ReAct loop leaves it behind."""
+    return [
+        HumanMessage(content=f"سؤال {index}"),
+        AIMessage(
+            content="",
+            tool_calls=[{"name": "search_products", "args": {"query": "x"}, "id": f"c{index}"}],
+        ),
+        ToolMessage(content="- محصول", tool_call_id=f"c{index}"),
+        AIMessage(content=f"پاسخ {index}"),
+    ]
+
+
+def test_recent_context_drops_tool_traffic() -> None:
+    context = recent_context(_react_turn(1))
+
+    assert [m.content for m in context] == ["سؤال 1", "پاسخ 1"]
+
+
+def test_recent_context_never_starts_on_an_orphaned_tool_message() -> None:
+    history = [message for index in range(5) for message in _react_turn(index)]
+
+    context = recent_context(history)
+
+    assert len(context) == RECENT_MESSAGES_WINDOW
+    assert not any(isinstance(m, ToolMessage) for m in context)
+    assert not any(isinstance(m, AIMessage) and m.tool_calls for m in context)
 
 
 def test_fills_entities_from_first_mention() -> None:

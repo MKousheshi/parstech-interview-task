@@ -22,7 +22,7 @@ from langgraph.prebuilt import create_react_agent
 
 from consultant_bot.common import config
 from consultant_bot.common.entities import Entities
-from consultant_bot.common.search.base import SearchStrategy
+from consultant_bot.common.search.base import SearchStrategy, format_hits
 from consultant_bot.flexible.state import State
 from consultant_bot.flexible.tools.search_products import build_search_products_tool
 
@@ -47,7 +47,8 @@ SYSTEM_PROMPT_TEMPLATE = """\
 وضعیت مشاوره: درخواست‌شده={consultation_requested}، قبلاً پیشنهادشده={consultation_offered}، \
 قبلاً انجام‌شده={consultation_done}
 
-آخرین محصولات نمایش‌داده‌شده به کاربر (برای پاسخ به سؤالات پیگیری بدون جست‌وجوی مجدد): \
+آخرین محصولات نمایش‌داده‌شده به کاربر — برای پاسخ به سؤالات پیگیری (مثل قیمت یا لینک) مستقیماً از \
+همین فهرست استفاده کن و جست‌وجو را دوباره اجرا نکن:
 {last_shown_products}
 
 دستورالعمل‌های مهم:
@@ -92,10 +93,9 @@ def _build_system_prompt(state: State) -> str:
         "، ".join(label for field, label in ENTITY_LABELS.items() if not entities.get(field))
         or "(هیچ)"
     )
-    shown_products = state.get("last_shown_products") or []
-    products_text = (
-        "، ".join(hit.product.name for hit in shown_products) if shown_products else "(هیچ)"
-    )
+    # Name, price and link — not just names: the follow-up questions this block exists to serve
+    # ("how much is it?", "send me the link") can't be answered from a bare list of names.
+    products_text = format_hits(state.get("last_shown_products") or []) or "(هیچ)"
 
     return SYSTEM_PROMPT_TEMPLATE.format(
         known_entities=known,

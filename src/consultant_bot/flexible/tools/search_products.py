@@ -13,7 +13,7 @@ from langchain_core.tools import BaseTool, InjectedToolCallId, tool
 from langgraph.types import Command
 
 from consultant_bot.common import config
-from consultant_bot.common.search.base import ProductHit, SearchStrategy
+from consultant_bot.common.search.base import SearchStrategy, format_hits
 from consultant_bot.common.search.embedding_search import EmbeddingSearch
 from consultant_bot.common.search.filter_search import FilterSearch
 from consultant_bot.common.search.products import Product, load_products
@@ -33,13 +33,7 @@ def build_active_strategy() -> SearchStrategy:
     return builder(products)
 
 
-def _format_hits(hits: list[ProductHit]) -> str:
-    if not hits:
-        return "هیچ محصول مرتبطی یافت نشد."
-    lines = [
-        f"- {hit.product.name} ({hit.product.price} تومان): {hit.product.permalink}" for hit in hits
-    ]
-    return "\n".join(lines)
+NO_HITS_MESSAGE = "هیچ محصول مرتبطی یافت نشد."
 
 
 def build_search_products_tool(
@@ -66,7 +60,11 @@ def build_search_products_tool(
         return Command(
             update={
                 "last_shown_products": hits,
-                "messages": [ToolMessage(content=_format_hits(hits), tool_call_id=tool_call_id)],
+                "messages": [
+                    ToolMessage(
+                        content=format_hits(hits) or NO_HITS_MESSAGE, tool_call_id=tool_call_id
+                    )
+                ],
             }
         )
 

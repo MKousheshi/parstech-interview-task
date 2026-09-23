@@ -5,10 +5,10 @@ just corrected. See `docs/ARCHITECTURE_FLEXIBLE.md`'s `extract_entities` section
 rules this implements.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any
 
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import Runnable
 from pydantic import BaseModel, Field
 
@@ -47,11 +47,30 @@ def build_default_extractor() -> Runnable[Any, ExtractedEntities]:
     return build_chat_model().with_structured_output(ExtractedEntities)  # type: ignore[return-value]
 
 
+def recent_context(messages: Sequence[BaseMessage]) -> list[BaseMessage]:
+    """The last `RECENT_MESSAGES_WINDOW` conversational messages — tool traffic excluded.
+
+    The assistant's ReAct loop interleaves `AIMessage(tool_calls=...)`/`ToolMessage` pairs into the
+    history, and a fixed-size window over the raw list can begin on a `ToolMessage` whose
+    originating tool call fell outside it — which OpenAI rejects outright ("a message with role
+    'tool' must be a response to a preceding message with tool_calls"). Tool traffic carries no
+    entity information anyway, so it's dropped *before* the window is taken, which also means the
+    window always spends its budget on actual user/assistant turns.
+    """
+    conversational: list[BaseMessage] = [
+        message
+        for message in messages
+        if isinstance(message, HumanMessage)
+        or (isinstance(message, AIMessage) and not message.tool_calls)
+    ]
+    return conversational[-RECENT_MESSAGES_WINDOW:]
+
+
 def build_extract_entities_node(
     extractor: Runnable[Any, ExtractedEntities],
 ) -> Callable[[State], dict[str, Any]]:
     def extract_entities(state: State) -> dict[str, Any]:
-        recent_messages = state["messages"][-RECENT_MESSAGES_WINDOW:]
+        recent_messages = recent_context(state["messages"])
         extracted = extractor.invoke([SystemMessage(content=SYSTEM_PROMPT), *recent_messages])
 
         entities: Entities = dict(state.get("entities", {}))  # type: ignore[assignment]

@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 from consultant_bot.common import config
 from consultant_bot.common.entities import ENTITY_FIELDS, Entities
 from consultant_bot.common.llm import build_chat_model
-from consultant_bot.common.search.base import ProductHit, SearchStrategy
+from consultant_bot.common.search.base import SearchStrategy, format_hits
 from consultant_bot.flexible.state import State
 
 ENTITY_LABELS: dict[str, str] = {
@@ -66,12 +66,6 @@ def _entities_summary(entities: Entities) -> str:
     )
 
 
-def _format_hits_for_prompt(hits: list[ProductHit]) -> str:
-    return "\n".join(
-        f"- {hit.product.name} ({hit.product.price} تومان): {hit.product.permalink}" for hit in hits
-    )
-
-
 def build_query_formulator() -> Runnable[Any, SearchQuery]:
     return build_chat_model().with_structured_output(SearchQuery)  # type: ignore[return-value]
 
@@ -109,7 +103,7 @@ def build_suggestion_node(
             message = formatting_llm.invoke(
                 [
                     SystemMessage(content=FORMATTING_SYSTEM_PROMPT),
-                    HumanMessage(content=_format_hits_for_prompt(hits)),
+                    HumanMessage(content=format_hits(hits)),
                 ]
             )
         else:
