@@ -19,11 +19,11 @@ Package management is via `uv`.
 - Run tests: `uv run pytest`
 - Run a single test: `uv run pytest tests/flexible/test_graph.py::test_route_after_assistant_ends_when_not_yet_requested`
 - Add a dependency: `uv add <package>` (dev-only: `uv add --dev <package>`)
-- **Run the full local check pipeline (lint, format check, types, dependency vulnerability scan, tests): `./scripts/check.sh`** — run this before considering any change done. `./scripts/check.sh --fix` auto-applies `ruff check --fix` and `ruff format` first.
+- **Run the full local check pipeline (lint, format check, types, tests): `./scripts/check.sh`** — run this before considering any change done. `./scripts/check.sh --fix` auto-applies `ruff check --fix` and `ruff format` first. The dependency vulnerability scan is opt-in: add `--audit` (combinable with `--fix`) only when a change adds or updates packages.
 - Lint only: `uv run ruff check .` (add `--fix` to auto-fix)
 - Format only: `uv run ruff format .` (add `--check` to check without writing)
 - Type-check only: `uv run mypy` (checks `src`, `tests` and `scripts`, per `pyproject.toml`)
-- Dependency vulnerability scan only: `uv run pip-audit`
+- Dependency vulnerability scan only (run when dependencies change): `uv run pip-audit`
 
 ## Repository map
 
