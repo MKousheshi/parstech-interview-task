@@ -19,7 +19,8 @@ Both architectures reuse the same product data pipeline and pluggable search str
 ```text
 src/consultant_bot/
   __init__.py
-  cli.py                   # REPL; --arch flexible|rigid picks which graph to build
+  architectures.py         # ARCHITECTURES registry: --arch flexible|rigid -> graph builder
+  webui.py                 # Gradio RTL web UI (the only front end)
   common/
     config.py               # model name/temperature, active search strategy, top_k
     entities.py              # shared Entities schema (business_type, customer_type, location, sales_channel)
@@ -112,9 +113,9 @@ class ProductHit:
 
 Same three phases as the flexible variant (filter/keyword, TF-IDF, embeddings), same protocol, same `config.py` selection, same `common/search/eval.py` comparison script — this part of the system doesn't differ between architectures.
 
-## CLI / session model
+## Web UI / session model
 
-Shared `cli.py`, selecting this graph via `--arch rigid`. Same REPL loop, in-memory checkpointer, per-process `thread_id`, no persistence beyond process lifetime — identical to the flexible variant.
+Shared `webui.py`, selecting this graph via `--arch rigid` (registered in `architectures.py`). Same in-memory checkpointer, per-browser-session `thread_id`, no persistence beyond process lifetime — identical to the flexible variant.
 
 ## Configuration
 
@@ -124,7 +125,7 @@ Same `common/config.py` as the flexible variant.
 
 - **Search strategies** — same deterministic unit tests, shared fixtures with the flexible variant.
 - **`capture_entity` / `ask_entity` / route selection** — trivial plain-function tests against constructed `State` values; no LLM needed for anything except `route_intent`, `analysis`, and `suggestion`'s formatting call.
-- **End-to-end** — exercised manually via the CLI demo.
+- **End-to-end** — exercised manually via the web UI demo.
 
 This variant is meaningfully easier to test without a live LLM than the flexible one, since most of the graph is plain deterministic code — a direct consequence of the design, not incidental.
 

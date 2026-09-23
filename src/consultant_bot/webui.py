@@ -1,8 +1,8 @@
-"""Gradio web UI, an alternative front end to the CLI REPL in `cli.py`.
+"""Gradio web UI, the chatbot's front end.
 
-Reuses the same `ARCHITECTURES` graph builders and in-memory checkpointer approach as the CLI: one
-compiled graph shared by the process, one `thread_id` per browser session (assigned on page load),
-so concurrent visitors get independent conversations without needing a real database.
+Builds the selected graph from `ARCHITECTURES` with an in-memory checkpointer: one compiled graph
+shared by the process, one `thread_id` per browser session (assigned on page load), so concurrent
+visitors get independent conversations without needing a real database.
 
 The `Chatbot`/`Textbox` components are configured `rtl=True` since the assistant's responses are in
 Persian. `WELCOME_MESSAGE` is seeded directly into the `Chatbot`'s initial value rather than run
@@ -19,7 +19,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph.state import CompiledStateGraph
 
-from consultant_bot.cli import ARCHITECTURES
+from consultant_bot.architectures import ARCHITECTURES
 from consultant_bot.common.messages import reply_texts
 
 WELCOME_MESSAGE = (

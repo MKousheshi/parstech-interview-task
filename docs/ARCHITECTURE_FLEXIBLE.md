@@ -8,7 +8,7 @@ Two capabilities are exposed through one flexible conversational graph: product 
 
 Rather than classifying each turn into a rigid conversational bucket and branching to a narrow templated node, a single general-purpose LLM node stays in the driver's seat for every reply. Hardcoded, deterministic logic is reserved only for what the task requires without exception: once all 4 entities are known *and* the user has actually asked for (or agreed to) a consultation, analysis and suggestion must run, as two separate, isolated LLM calls. Entities becoming complete is not, by itself, a trigger — if all 4 are known but nothing has been requested yet, the assistant proactively offers to run the consultation instead of firing it unasked. Everything else — search, follow-ups on prior results, tangents, off-topic questions, corrections, unexpected input — is handled by that same flexible node, so the assistant can't get stuck in a dead end a misrouted classifier picked for it.
 
-The graph is invoked once per user turn. Conversation state persists across turns via LangGraph's in-memory checkpointer, keyed by a session `thread_id` that lives for the lifetime of the CLI process (per the in-memory-only persistence decision).
+The graph is invoked once per user turn. Conversation state persists across turns via LangGraph's in-memory checkpointer, keyed by a per-browser-session `thread_id` minted by the web UI (per the in-memory-only persistence decision).
 
 ## Shared infrastructure
 
@@ -19,15 +19,15 @@ Both architectures reuse the same product data pipeline and pluggable search str
 ```text
 src/consultant_bot/
   __init__.py
-  cli.py                   # REPL; --arch flexible|rigid picks which graph to build
-  webui.py                 # Gradio RTL web UI; same ARCHITECTURES graph builders as the CLI,
-                            # one thread_id per browser session via gr.State
+  architectures.py         # ARCHITECTURES registry: --arch flexible|rigid -> graph builder
+  webui.py                 # Gradio RTL web UI (the only front end); one thread_id per browser
+                            # session via gr.State
   common/
     config.py               # OpenAI connection details (via pydantic-settings/.env), model
                              # name/temperature, active search strategy, top_k
     entities.py              # shared Entities schema + ENTITY_FIELDS (business_type, customer_type, location, sales_channel)
     llm.py                   # shared build_chat_model() factory used by every LLM-touching node
-    messages.py               # reply_texts(): the AI replies a turn appended, for both front ends
+    messages.py               # reply_texts(): the AI replies a turn appended, for the web UI
     search/
       products.py             # loads + cleans products.json into Product records
       base.py                  # SearchStrategy protocol + ProductHit dataclass + format_hits()
@@ -125,19 +125,13 @@ class ProductHit:
 
 Three interchangeable implementations (filter/keyword, TF-IDF, embeddings — see `ARCHITECTURE_RIGID.md` for the per-phase detail, identical here) live behind this protocol. `config.py` selects the active one; `flexible/tools/search_products.py` wraps it as a LangChain tool that also updates `state.last_shown_products`. `common/search/eval.py` runs a fixed set of realistic Persian queries — including a compound/multi-facet one issued as a single call, to show how each phase's single-query-vector ranking degrades on it standalone — against every implemented strategy side by side.
 
-## CLI / session model
+## Web UI / session model
 
-`cli.py` runs a REPL shared across both architectures, selecting which graph to build via an `--arch` flag (or equivalent):
+`webui.py` is the only front end (the original CLI REPL was dropped — see `DECISIONS.md`). It builds the graph selected via `--arch` from the `ARCHITECTURES` registry (`architectures.py`), Gradio-based and RTL-enabled for Persian: one graph is built once per process with a single shared `MemorySaver`, and a fresh `thread_id` is minted per browser session (via `gr.State` on `demo.load`), so concurrent visitors get isolated conversations without a real database. Its `Chatbot` is seeded with a static welcome message shown on load, which never goes through the graph and isn't recorded in any thread's conversation state.
 
-1. Build the graph once, with an in-memory `MemorySaver` checkpointer.
-2. Generate one `thread_id` for the process lifetime.
-3. Loop: read a line from stdin → `graph.invoke(...)` → print the newly appended AI message(s) (there may be more than one per turn, per the immediate analysis+suggestion firing above) → repeat until EOF/`exit`.
-
-Both front ends select what to show through the shared `common/messages.py:reply_texts()`, so they display the same thing: *every* AI message the turn appended, in order, minus the ReAct loop's intermediate tool-call messages (which carry no text and would render as blank turns). Showing only the last message would silently drop the business analysis on the turn the consultation fires — the analysis is a required output in its own right, not a preamble to the suggestion.
+`turn_replies()` reads the prior message count back from the thread's own checkpointed state before invoking, so the "what did this turn append" slice stays correct across concurrent sessions sharing the process. What to show is selected by `common/messages.py:reply_texts()`: *every* AI message the turn appended, in order, minus the ReAct loop's intermediate tool-call messages (which carry no text and would render as blank turns). Showing only the last message would silently drop the business analysis on the turn the consultation fires — the analysis is a required output in its own right, not a preamble to the suggestion. Gradio renders the returned list as one bubble per reply.
 
 No persistence beyond process lifetime.
-
-`webui.py` is a second front end over the same `ARCHITECTURES` graph builders (Gradio, RTL-enabled for Persian): one graph is built once per process with a single shared `MemorySaver`, and instead of one `thread_id` for the process lifetime it mints a fresh `thread_id` per browser session (via `gr.State` on `demo.load`), so concurrent visitors get isolated conversations without a real database. Its `Chatbot` is seeded with a static welcome message shown on load, which never goes through the graph and isn't recorded in any thread's conversation state. Where the CLI tracks the prior message count in a local variable, `turn_replies()` reads it back from the thread's own checkpointed state before invoking, so the "what did this turn append" slice stays correct across concurrent sessions sharing the process; Gradio renders the returned list as one bubble per reply.
 
 ## Configuration
 
@@ -154,8 +148,8 @@ OpenAI connection details (`OPENAI_API_KEY`, optional `OPENAI_BASE_URL`, optiona
 - **`assistant`'s proactive-offer condition** — extracted as the pure `is_complete_but_unrequested_and_unoffered(state)` function specifically so it's unit-testable in isolation from the tool-calling loop around it.
 - **`analysis`'s context isolation** — a fake LLM that records exactly what messages it was invoked with, asserting the call is always exactly a system message plus a 2-line entities summary, never `state["messages"]` or `last_shown_products`. Turns "isolation is structural" from a design claim into something a test actually checks.
 - **`suggestion`'s threshold/retrieval logic** — a fake `SearchStrategy` and fake formatting LLM, asserting the formatter is never even called when nothing clears the relevance floor (the honest-fallback path), and that `consultation_done`/`last_shown_products` are set in both the found and nothing-found branches.
-- **`assistant` node behavior** (tool-calling, decomposition, follow-ups, off-topic handling, not pre-empting analysis) and the query-formulation/formatting LLM calls inside `suggestion` aren't meaningfully unit-testable without a live/mocked LLM — exercised manually via the CLI demo.
-- **End-to-end** — exercised manually via the CLI demo. (As of this writing, that manual pass is still pending in this environment for lack of an `OPENAI_API_KEY` — see `docs/TODO_FLEXIBLE.md`.)
+- **`assistant` node behavior** (tool-calling, decomposition, follow-ups, off-topic handling, not pre-empting analysis) and the query-formulation/formatting LLM calls inside `suggestion` aren't meaningfully unit-testable without a live/mocked LLM — exercised manually via the web UI demo.
+- **End-to-end** — exercised manually via the web UI demo. (As of this writing, that manual pass is still pending in this environment for lack of an `OPENAI_API_KEY` — see `docs/TODO_FLEXIBLE.md`.)
 
 ## Comparison notes
 

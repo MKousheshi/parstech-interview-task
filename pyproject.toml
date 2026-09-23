@@ -18,7 +18,6 @@ dependencies = [
 ]
 
 [project.scripts]
-consultant-bot = "consultant_bot.cli:main"
 consultant-bot-web = "consultant_bot.webui:main"
 
 [build-system]

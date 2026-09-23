@@ -75,3 +75,9 @@ In progress. See `CLARIFICATIONS.md` for the open questions driving these decisi
 - **Decision:** Pin `sentence-transformers`' `paraphrase-multilingual-MiniLM-L12-v2` as the Phase 3 embedding model.
 - **Why:** Small (~118MB) and fast enough for local CPU inference in a demo, while covering Persian among its 50+ supported languages — sufficient to catch semantic/synonym matches TF-IDF misses without needing GPU inference or an API call.
 - **Alternatives considered:** a larger multilingual model (e.g. `paraphrase-multilingual-mpnet-base-v2`) for better semantic accuracy, at the cost of slower local encoding — not worth it for a 29-product catalog where TF-IDF and embeddings are already being compared side by side rather than one being the final answer.
+
+### 2026-09-23 — Drop the CLI; the Gradio web UI is the only front end
+
+- **Decision:** Remove the terminal REPL (`cli.py` and the `consultant-bot` script). The Gradio web UI (`uv run consultant-bot-web`) is the only front end; the `--arch` graph registry moves to its own `architectures.py` module. This supersedes the "Delivery interface: CLI chat loop" decision, and the "working CLI demo" acceptance bar now means a working web UI demo.
+- **Why:** The web UI already covers everything the CLI did, and renders Persian right-to-left properly, which a terminal doesn't. Keeping two front ends meant two copies of the "which replies did this turn append" logic, plus the web UI importing its graph registry from the CLI module.
+- **Alternatives considered:** keeping the CLI as a lightweight debugging entry point — not worth the upkeep, since the web UI is the demo that actually gets shown.

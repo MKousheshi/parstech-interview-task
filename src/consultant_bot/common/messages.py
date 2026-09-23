@@ -1,8 +1,8 @@
 """Turning a graph invocation's appended messages into front-end-ready reply text.
 
-Shared by both front ends (`cli.py` and `webui.py`) so they show the same thing: a single turn can
-append more than one AI message — the assistant's own reply, then the `analysis` and `suggestion`
-pair when the consultation fires — and all of them are part of the answer.
+Used by the web UI (`webui.py`) to decide what to show: a single turn can append more than one AI
+message — the assistant's own reply, then the `analysis` and `suggestion` pair when the
+consultation fires — and all of them are part of the answer.
 """
 
 from collections.abc import Sequence
