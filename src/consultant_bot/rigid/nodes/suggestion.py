@@ -16,6 +16,7 @@ from langchain_core.language_models import LanguageModelLike
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from consultant_bot.common.entities import Entities
+from consultant_bot.common.messages import as_reply
 from consultant_bot.common.search.base import SearchStrategy, format_hits
 from consultant_bot.rigid.state import Node, State
 
@@ -45,14 +46,16 @@ def build_suggestion_node(
         logger.info("suggestion query %r: %d hit(s)", query, len(hits))
 
         if hits:
-            message = formatting_llm.invoke(
-                [
-                    SystemMessage(content=FORMATTING_SYSTEM_PROMPT),
-                    HumanMessage(
-                        content=f"اطلاعات کسب‌وکار:\n{entities.summary()}\n\n"
-                        f"محصولات:\n{format_hits(hits)}"
-                    ),
-                ]
+            message = as_reply(
+                formatting_llm.invoke(
+                    [
+                        SystemMessage(content=FORMATTING_SYSTEM_PROMPT),
+                        HumanMessage(
+                            content=f"اطلاعات کسب‌وکار:\n{entities.summary()}\n\n"
+                            f"محصولات:\n{format_hits(hits)}"
+                        ),
+                    ]
+                )
             )
         else:
             message = AIMessage(content=NO_RESULTS_MESSAGE)

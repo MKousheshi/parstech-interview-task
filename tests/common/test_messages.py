@@ -1,6 +1,6 @@
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
-from consultant_bot.common.messages import latest_user_text, reply_texts
+from consultant_bot.common.messages import as_reply, latest_user_text, reply_texts
 
 
 def test_returns_every_ai_reply_in_order() -> None:
@@ -51,3 +51,16 @@ def test_latest_user_text_is_the_last_human_message_trimmed() -> None:
 
 def test_latest_user_text_is_empty_without_a_user_message() -> None:
     assert latest_user_text([AIMessage(content="سلام")]) == ""
+
+
+def test_as_reply_wraps_a_plain_string_as_an_ai_message() -> None:
+    reply = as_reply("پاسخ")
+
+    assert isinstance(reply, AIMessage)
+    assert reply.content == "پاسخ"
+
+
+def test_as_reply_keeps_a_message_as_is() -> None:
+    message = AIMessage(content="پاسخ")
+
+    assert as_reply(message) is message

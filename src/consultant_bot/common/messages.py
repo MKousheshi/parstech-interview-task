@@ -7,6 +7,7 @@ user's raw message with `latest_user_text`.
 """
 
 from collections.abc import Sequence
+from typing import Any
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
@@ -18,6 +19,17 @@ def message_text(message: BaseMessage) -> str:
         return content.strip()
     # Some providers return content as a list of blocks; keep only the textual ones.
     return "".join(part.get("text", "") for part in content if isinstance(part, dict)).strip()
+
+
+def as_reply(response: Any) -> BaseMessage:
+    """A model's response as a message that can go into `messages`.
+
+    Nodes take a `LanguageModelLike`, which may return a plain `str`. `add_messages` would turn a
+    bare string into a `HumanMessage`, recording the model's reply as if the user had said it.
+    """
+    if isinstance(response, BaseMessage):
+        return response
+    return AIMessage(content=str(response))
 
 
 def reply_texts(messages: Sequence[BaseMessage]) -> list[str]:

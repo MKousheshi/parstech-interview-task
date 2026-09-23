@@ -70,3 +70,14 @@ def test_analysis_appends_the_llm_response_and_stores_its_text() -> None:
 
     assert result["messages"] == [response]
     assert result["analysis"] == "تحلیل نهایی"
+
+
+def test_a_plain_string_reply_is_recorded_as_the_assistants_message() -> None:
+    node = build_analysis_node(ScriptedRunnable("تحلیل کسب‌وکار"))
+
+    update = node({"messages": [], "entities": COMPLETE_ENTITIES})
+
+    [message] = update["messages"]
+    assert isinstance(message, AIMessage)
+    assert message.content == "تحلیل کسب‌وکار"
+    assert update["analysis"] == "تحلیل کسب‌وکار"

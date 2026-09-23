@@ -14,15 +14,14 @@ from langchain_core.language_models import LanguageModelLike
 
 from consultant_bot.common.analysis import analysis_messages
 from consultant_bot.common.entities import Entities
-from consultant_bot.common.messages import message_text
+from consultant_bot.common.messages import as_reply, message_text
 from consultant_bot.flexible.state import Node, State
 
 
 def build_analysis_node(llm: LanguageModelLike) -> Node:
     def analysis(state: State) -> dict[str, Any]:
         entities = state.get("entities") or Entities()
-        response = llm.invoke(analysis_messages(entities))
-        text = response if isinstance(response, str) else message_text(response)
-        return {"messages": [response], "analysis": text}
+        response = as_reply(llm.invoke(analysis_messages(entities)))
+        return {"messages": [response], "analysis": message_text(response)}
 
     return analysis

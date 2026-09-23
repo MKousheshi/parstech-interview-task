@@ -27,6 +27,7 @@ from langchain_core.runnables import Runnable
 from pydantic import BaseModel, Field
 
 from consultant_bot.common.entities import Entities
+from consultant_bot.common.messages import as_reply
 from consultant_bot.common.search.base import (
     ProductHit,
     SearchStrategy,
@@ -124,11 +125,13 @@ def build_suggestion_node(
         )
 
         if hits:
-            message = formatting_llm.invoke(
-                [
-                    SystemMessage(content=FORMATTING_SYSTEM_PROMPT),
-                    HumanMessage(content=format_hits(hits)),
-                ]
+            message = as_reply(
+                formatting_llm.invoke(
+                    [
+                        SystemMessage(content=FORMATTING_SYSTEM_PROMPT),
+                        HumanMessage(content=format_hits(hits)),
+                    ]
+                )
             )
         else:
             message = AIMessage(content=NO_RESULTS_MESSAGE)
