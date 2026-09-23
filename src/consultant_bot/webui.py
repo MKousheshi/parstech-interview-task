@@ -16,10 +16,10 @@ import uuid
 import gradio as gr
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
-from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph.state import CompiledStateGraph
 
 from consultant_bot.architectures import ARCHITECTURES
+from consultant_bot.common.checkpoint import build_checkpointer
 from consultant_bot.common.messages import reply_texts
 
 WELCOME_MESSAGE = (
@@ -49,7 +49,7 @@ def turn_replies(app: CompiledStateGraph, thread_id: str, message: str) -> list[
 
 
 def build_demo(arch: str = "flexible") -> gr.Blocks:
-    app = ARCHITECTURES[arch](MemorySaver())
+    app = ARCHITECTURES[arch](build_checkpointer())
 
     def respond(message: str, history: list[dict[str, str]], thread_id: str) -> list[str]:
         # A turn that somehow appended nothing would otherwise render as no reply at all, which
