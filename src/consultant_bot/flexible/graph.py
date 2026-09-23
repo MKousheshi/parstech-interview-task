@@ -30,21 +30,23 @@ def _route_after_assistant(state: State) -> str:
 def build_graph(checkpointer: BaseCheckpointSaver | None = None) -> CompiledStateGraph:
     top_k = get_settings().search_top_k
     strategy = build_active_strategy()
+    # One client shared by every node. Tool binding and structured output each wrap it in a new
+    # runnable rather than mutating it, so `analysis` still gets a plain, tool-free model.
+    llm = build_chat_model()
 
     graph = StateGraph(State)
     # mypy can't match a plain `Callable[[State], dict[str, Any]]` against add_node's generic
     # `StateNode[NodeInputT, ...]` overloads, even though it's a perfectly valid node at runtime.
     graph.add_node(  # type: ignore[call-overload]
-        "extract_entities", build_extract_entities_node(build_default_extractor())
+        "extract_entities", build_extract_entities_node(build_default_extractor(llm))
     )
     graph.add_node(  # type: ignore[call-overload]
-        "assistant",
-        build_assistant_node(build_chat_model(), strategy, top_k=top_k),
+        "assistant", build_assistant_node(llm, strategy, top_k=top_k)
     )
-    graph.add_node("analysis", build_analysis_node(build_chat_model()))  # type: ignore[call-overload]
+    graph.add_node("analysis", build_analysis_node(llm))  # type: ignore[call-overload]
     graph.add_node(  # type: ignore[call-overload]
         "suggestion",
-        build_suggestion_node(build_query_formulator(), strategy, build_chat_model(), top_k=top_k),
+        build_suggestion_node(build_query_formulator(llm), strategy, llm, top_k=top_k),
     )
 
     graph.add_edge(START, "extract_entities")

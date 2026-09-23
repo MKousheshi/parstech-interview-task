@@ -8,12 +8,12 @@ rules this implements.
 from collections.abc import Callable, Sequence
 from typing import Any
 
+from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import Runnable
 from pydantic import Field
 
 from consultant_bot.common.entities import ENTITY_FIELDS, Entities
-from consultant_bot.common.llm import build_chat_model
 from consultant_bot.flexible.state import State
 
 # How many recent messages to give the extractor, for pronoun/reference resolution and for
@@ -39,8 +39,8 @@ class ExtractedEntities(Entities):
     wants_consultation: bool = Field(default=False)
 
 
-def build_default_extractor() -> Runnable[Any, ExtractedEntities]:
-    return build_chat_model().with_structured_output(ExtractedEntities)  # type: ignore[return-value]
+def build_default_extractor(llm: BaseChatModel) -> Runnable[Any, ExtractedEntities]:
+    return llm.with_structured_output(ExtractedEntities)  # type: ignore[return-value]
 
 
 def recent_context(messages: Sequence[BaseMessage]) -> list[BaseMessage]:

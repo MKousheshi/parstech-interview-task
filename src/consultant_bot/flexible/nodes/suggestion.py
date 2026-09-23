@@ -14,13 +14,12 @@ cleared the threshold — the consultation itself is still considered complete e
 from collections.abc import Callable
 from typing import Any
 
-from langchain_core.language_models import LanguageModelLike
+from langchain_core.language_models import BaseChatModel, LanguageModelLike
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import Runnable
 from pydantic import BaseModel, Field
 
 from consultant_bot.common.entities import Entities
-from consultant_bot.common.llm import build_chat_model
 from consultant_bot.common.search.base import (
     SearchStrategy,
     format_hits,
@@ -50,8 +49,8 @@ class SearchQuery(BaseModel):
     category: str | None = Field(default=None, description="نام دسته‌بندی حدسی، در صورت مشخص بودن")
 
 
-def build_query_formulator() -> Runnable[Any, SearchQuery]:
-    return build_chat_model().with_structured_output(SearchQuery)  # type: ignore[return-value]
+def build_query_formulator(llm: BaseChatModel) -> Runnable[Any, SearchQuery]:
+    return llm.with_structured_output(SearchQuery)  # type: ignore[return-value]
 
 
 def build_suggestion_node(
