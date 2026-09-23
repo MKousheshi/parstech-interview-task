@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Interview take-home task. The **flexible** architecture (see `docs/ARCHITECTURE_FLEXIBLE.md`) is fully implemented: shared product pipeline, all three search-strategy phases, and the full `extract_entities -> assistant -> completion_check -> (analysis -> suggestion | END)` graph, wired up behind `uv run consultant-bot --arch flexible`. The **rigid** architecture (`docs/ARCHITECTURE_RIGID.md`) has not been started yet — only the flexible variant's checklist (`docs/TODO_FLEXIBLE.md`) has been worked through. Live-LLM manual QA (the CLI demo scenarios called for in the architecture doc) is still pending in whatever environment picks this up next, since no `OPENAI_API_KEY` was available while building the flexible variant.
 
+## Configuration
+
+OpenAI connection details are loaded via `pydantic-settings` from a `.env` file at the repo root (see `src/consultant_bot/common/config.py`). Copy `example.env` to `.env` and fill in `OPENAI_API_KEY` before running the CLI or any LLM-touching test; `OPENAI_BASE_URL` and `OPENAI_MODEL` are optional overrides (defaults: OpenAI's own endpoint, `gpt-4o-mini`).
+
 ## Commands
 
 Package management is via `uv`.

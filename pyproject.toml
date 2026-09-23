@@ -11,6 +11,7 @@ dependencies = [
     "langchain-openai>=1.6.3",
     "langgraph>=1.2.12",
     "pydantic>=2.13.5",
+    "pydantic-settings>=2.15.0",
     "scikit-learn>=1.9.1",
     "sentence-transformers>=6.1.0",
 ]
