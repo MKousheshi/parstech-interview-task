@@ -13,7 +13,7 @@ from langchain_core.runnables import Runnable
 from pydantic import BaseModel, Field
 
 from consultant_bot.common import config
-from consultant_bot.common.entities import Entities
+from consultant_bot.common.entities import ENTITY_FIELDS, Entities
 from consultant_bot.flexible.state import State
 
 # How many recent messages to give the extractor, for pronoun/reference resolution and for
@@ -41,9 +41,6 @@ class ExtractedEntities(BaseModel):
     location: str | None = Field(default=None)
     sales_channel: str | None = Field(default=None)
     wants_consultation: bool = Field(default=False)
-
-
-ENTITY_FIELDS: tuple[str, ...] = ("business_type", "customer_type", "location", "sales_channel")
 
 
 def build_default_extractor() -> Runnable[Any, ExtractedEntities]:
