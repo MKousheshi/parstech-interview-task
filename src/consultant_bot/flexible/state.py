@@ -1,6 +1,6 @@
 """Conversation state for the flexible (agentic) architecture."""
 
-from typing import Annotated, NotRequired, TypedDict
+from typing import Annotated, Any, NotRequired, Protocol, TypedDict
 
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
@@ -18,3 +18,12 @@ class State(TypedDict):
     consultation_done: NotRequired[bool]
     # The latest free-knowledge analysis text, written by `analysis` and read by `suggestion`.
     analysis: NotRequired[str | None]
+
+
+class Node(Protocol):
+    """What the node factories return. A Protocol rather than `Callable[[State], ...]` because
+    LangGraph's `add_node` matches nodes against a protocol whose parameter is named `state`, which
+    a bare `Callable` (positional-only) doesn't satisfy for mypy.
+    """
+
+    def __call__(self, state: State) -> dict[str, Any]: ...

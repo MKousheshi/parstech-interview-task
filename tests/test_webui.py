@@ -31,7 +31,7 @@ class _State(TypedDict):
 def _build_app() -> Any:
     """A graph whose single turn appends the same shape a consultation-firing turn does."""
 
-    def reply(_state: _State) -> dict[str, Any]:
+    def reply(state: _State) -> dict[str, Any]:
         return {
             "messages": [
                 AIMessage(
@@ -46,7 +46,7 @@ def _build_app() -> Any:
         }
 
     graph = StateGraph(_State)
-    graph.add_node("reply", reply)  # type: ignore[call-overload]
+    graph.add_node("reply", reply)
     graph.add_edge(START, "reply")
     graph.add_edge("reply", END)
     return graph.compile(checkpointer=MemorySaver())

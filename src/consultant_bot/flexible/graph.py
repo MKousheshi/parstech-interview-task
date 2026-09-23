@@ -42,16 +42,10 @@ def build_graph(checkpointer: BaseCheckpointSaver | None = None) -> CompiledStat
     llm = build_chat_model()
 
     graph = StateGraph(State)
-    # mypy can't match a plain `Callable[[State], dict[str, Any]]` against add_node's generic
-    # `StateNode[NodeInputT, ...]` overloads, even though it's a perfectly valid node at runtime.
-    graph.add_node(  # type: ignore[call-overload]
-        "extract_entities", build_extract_entities_node(build_default_extractor(llm))
-    )
-    graph.add_node(  # type: ignore[call-overload]
-        "assistant", build_assistant_node(llm, strategy, top_k=top_k)
-    )
-    graph.add_node("analysis", build_analysis_node(llm))  # type: ignore[call-overload]
-    graph.add_node(  # type: ignore[call-overload]
+    graph.add_node("extract_entities", build_extract_entities_node(build_default_extractor(llm)))
+    graph.add_node("assistant", build_assistant_node(llm, strategy, top_k=top_k))
+    graph.add_node("analysis", build_analysis_node(llm))
+    graph.add_node(
         "suggestion",
         build_suggestion_node(build_query_formulator(llm), strategy, llm, top_k=top_k),
     )

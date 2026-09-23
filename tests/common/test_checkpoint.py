@@ -33,7 +33,7 @@ def test_state_types_round_trip_through_the_checkpointer_without_warnings(
         )
     )
     graph = StateGraph(State)
-    graph.add_node(  # type: ignore[call-overload]
+    graph.add_node(
         "assistant", build_assistant_node(llm, FilterSearch(load_products(FIXTURE_PATH)), top_k=5)
     )
     graph.add_edge(START, "assistant")

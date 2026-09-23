@@ -14,7 +14,7 @@ differ only in spacing or Arabic/Persian letter variants don't count as a change
 """
 
 import logging
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from typing import Any
 
 from langchain_core.language_models import BaseChatModel
@@ -24,7 +24,7 @@ from pydantic import Field
 
 from consultant_bot.common.entities import ENTITY_FIELDS, Entities
 from consultant_bot.common.search.text import normalize
-from consultant_bot.flexible.state import State
+from consultant_bot.flexible.state import Node, State
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +87,7 @@ def _comparable(value: str | None) -> str:
 
 def build_extract_entities_node(
     extractor: Runnable[Any, ExtractedEntities],
-) -> Callable[[State], dict[str, Any]]:
+) -> Node:
     def extract_entities(state: State) -> dict[str, Any]:
         entities = state.get("entities") or Entities()
         prompt = SYSTEM_PROMPT.format(known_entities=entities.summary() or "(هنوز هیچ‌کدام)")

@@ -14,7 +14,6 @@ and the `suggestion` node records its own retrieval there the same way. No separ
 products" slot is kept, so the model isn't steered toward only the latest result set.
 """
 
-from collections.abc import Callable
 from typing import Any, NotRequired
 
 from langchain.agents import AgentState, create_agent
@@ -23,7 +22,7 @@ from langchain_core.language_models import BaseChatModel
 
 from consultant_bot.common.entities import Entities
 from consultant_bot.common.search.base import SearchStrategy
-from consultant_bot.flexible.state import State
+from consultant_bot.flexible.state import Node, State
 from consultant_bot.flexible.tools.search_products import build_search_products_tool
 
 SYSTEM_PROMPT_TEMPLATE = """\
@@ -106,7 +105,7 @@ def _system_prompt(request: ModelRequest) -> str:
 
 def build_assistant_node(
     llm: BaseChatModel, search_strategy: SearchStrategy, *, top_k: int
-) -> Callable[[State], dict[str, Any]]:
+) -> Node:
     search_tool = build_search_products_tool(search_strategy, top_k=top_k)
     agent = create_agent(
         model=llm,

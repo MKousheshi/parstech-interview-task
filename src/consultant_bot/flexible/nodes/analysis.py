@@ -8,7 +8,6 @@ into this call. This isolation is structural (the node only ever receives a plai
 convention, since it's a documented hard requirement — see `docs/DECISIONS.md`.
 """
 
-from collections.abc import Callable
 from typing import Any
 
 from langchain_core.language_models import LanguageModelLike
@@ -16,10 +15,10 @@ from langchain_core.language_models import LanguageModelLike
 from consultant_bot.common.analysis import analysis_messages
 from consultant_bot.common.entities import Entities
 from consultant_bot.common.messages import message_text
-from consultant_bot.flexible.state import State
+from consultant_bot.flexible.state import Node, State
 
 
-def build_analysis_node(llm: LanguageModelLike) -> Callable[[State], dict[str, Any]]:
+def build_analysis_node(llm: LanguageModelLike) -> Node:
     def analysis(state: State) -> dict[str, Any]:
         entities = state.get("entities") or Entities()
         response = llm.invoke(analysis_messages(entities))

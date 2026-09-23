@@ -18,7 +18,6 @@ consultation itself is still considered complete either way.
 """
 
 import logging
-from collections.abc import Callable
 from typing import Any
 from uuid import uuid4
 
@@ -34,7 +33,7 @@ from consultant_bot.common.search.base import (
     format_hits,
     search_with_category_fallback,
 )
-from consultant_bot.flexible.state import State
+from consultant_bot.flexible.state import Node, State
 from consultant_bot.flexible.tools.search_products import NO_HITS_MESSAGE, SEARCH_PRODUCTS_TOOL_NAME
 
 logger = logging.getLogger(__name__)
@@ -97,7 +96,7 @@ def build_suggestion_node(
     *,
     top_k: int,
     relevance_threshold: float | None = None,
-) -> Callable[[State], dict[str, Any]]:
+) -> Node:
     threshold = strategy.relevance_threshold if relevance_threshold is None else relevance_threshold
 
     def suggestion(state: State) -> dict[str, Any]:
