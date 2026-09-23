@@ -10,7 +10,8 @@ from collections.abc import Sequence
 from langchain_core.messages import AIMessage, BaseMessage
 
 
-def _text_of(message: AIMessage) -> str:
+def message_text(message: BaseMessage) -> str:
+    """The message's text content, whether the provider returned a string or content blocks."""
     content = message.content
     if isinstance(content, str):
         return content.strip()
@@ -28,5 +29,5 @@ def reply_texts(messages: Sequence[BaseMessage]) -> list[str]:
     return [
         text
         for message in messages
-        if isinstance(message, AIMessage) and (text := _text_of(message))
+        if isinstance(message, AIMessage) and (text := message_text(message))
     ]

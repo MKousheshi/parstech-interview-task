@@ -27,8 +27,10 @@ def _product(product_id: int) -> Product:
 class FakeQueryFormulator:
     def __init__(self, response: SearchQuery) -> None:
         self.response = response
+        self.received_messages: list | None = None  # type: ignore[type-arg]
 
-    def invoke(self, _messages: list) -> SearchQuery:  # type: ignore[type-arg]
+    def invoke(self, messages: list) -> SearchQuery:  # type: ignore[type-arg]
+        self.received_messages = messages
         return self.response
 
 
@@ -56,6 +58,7 @@ def _state():  # type: ignore[no-untyped-def]
     return {
         "messages": [AIMessage(content="تحلیل کسب‌وکار شما این است...")],
         "entities": COMPLETE_ENTITIES,
+        "analysis": "تحلیل کسب‌وکار شما این است...",
     }
 
 
@@ -123,3 +126,18 @@ def test_search_is_called_with_the_formulated_query_and_category() -> None:
     node(_state())
 
     assert strategy.received_query == "مدیریت پیج اینستاگرام"
+
+
+def test_query_formulation_reads_the_analysis_field_not_the_last_message() -> None:
+    formulator = FakeQueryFormulator(SearchQuery(query="کافه"))
+    node = build_suggestion_node(
+        formulator, FakeSearchStrategy([]), RecordingFakeLLM(AIMessage(content="")), 0.1
+    )
+    state = _state()
+    state["messages"].append(AIMessage(content="پیام نامرتبط بعدی"))
+
+    node(state)
+
+    prompt = formulator.received_messages[1].content  # type: ignore[index]
+    assert "تحلیل کسب‌وکار شما این است..." in prompt
+    assert "پیام نامرتبط بعدی" not in prompt

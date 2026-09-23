@@ -15,6 +15,7 @@ from langchain_core.language_models import LanguageModelLike
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from consultant_bot.common.entities import ENTITY_FIELDS, Entities
+from consultant_bot.common.messages import message_text
 from consultant_bot.flexible.state import State
 
 ENTITY_LABELS: dict[str, str] = {
@@ -44,6 +45,7 @@ def build_analysis_node(llm: LanguageModelLike) -> Callable[[State], dict[str, A
         entities: Entities = state.get("entities", {})
         summary = _entities_summary(entities)
         response = llm.invoke([SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=summary)])
-        return {"messages": [response]}
+        text = response if isinstance(response, str) else message_text(response)
+        return {"messages": [response], "analysis": text}
 
     return analysis

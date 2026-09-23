@@ -62,10 +62,11 @@ class State(TypedDict):
     consultation_offered: bool       # the proactive offer has already been made once since entities completed
     consultation_done: bool
     last_shown_products: list[ProductHit] | None
+    analysis: str | None             # latest analysis text, written by `analysis`, read by `suggestion`
     remaining_steps: NotRequired[RemainingSteps]  # required by create_react_agent, see below
 ```
 
-`messages` uses LangGraph's `add_messages` reducer so each turn appends rather than overwrites. The free-knowledge analysis text doesn't need its own state field — it's just another `AIMessage` in `messages` once produced.
+`messages` uses LangGraph's `add_messages` reducer so each turn appends rather than overwrites. The free-knowledge analysis is appended to `messages` like any reply, and its text is also stored in its own `analysis` field, which is what `suggestion` reads — so `suggestion` doesn't depend on the analysis happening to be the last message.
 
 `remaining_steps` is a LangGraph implementation detail, not part of the conceptual design: `create_react_agent` (used inside `assistant`, below) requires it to be present whenever a custom `state_schema` is passed, since it tracks the ReAct loop's remaining recursion budget internally.
 

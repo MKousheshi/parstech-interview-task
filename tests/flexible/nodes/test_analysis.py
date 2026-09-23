@@ -58,7 +58,7 @@ def test_analysis_summary_includes_all_four_entities() -> None:
         assert value in summary
 
 
-def test_analysis_appends_the_llm_response_as_a_message() -> None:
+def test_analysis_appends_the_llm_response_and_stores_its_text() -> None:
     response = AIMessage(content="تحلیل نهایی")
     fake_llm = RecordingFakeLLM(response)
     node = build_analysis_node(fake_llm)  # type: ignore[arg-type]
@@ -66,3 +66,4 @@ def test_analysis_appends_the_llm_response_as_a_message() -> None:
     result = node({"messages": [], "entities": COMPLETE_ENTITIES, "last_shown_products": None})
 
     assert result["messages"] == [response]
+    assert result["analysis"] == "تحلیل نهایی"

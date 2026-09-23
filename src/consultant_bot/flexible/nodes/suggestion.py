@@ -1,9 +1,9 @@
 """suggestion node: query formulation, retrieval with a relevance floor, and grounded formatting.
 
 Two internal steps, both deterministic in sequence: (1) a small LLM call turns the 4 entities plus
-the analysis text (the message `analysis` just appended) into a short, focused search query and an
-optional category guess; (2) `search_products` is called directly against the active
-`SearchStrategy` — not through the assistant's tool loop — a strategy-appropriate relevance
+the analysis text (`state["analysis"]`, written by the `analysis` node) into a short, focused
+search query and an optional category guess; (2) `search_products` is called directly against the
+active `SearchStrategy` — not through the assistant's tool loop — a strategy-appropriate relevance
 threshold is applied, and only hits that clear it are ever shown to the formatting LLM, which is
 explicitly told not to invent products and to say so honestly if none did.
 
@@ -89,7 +89,7 @@ def build_suggestion_node(
 
     def suggestion(state: State) -> dict[str, Any]:
         entities: Entities = state.get("entities", {})
-        analysis_text = str(state["messages"][-1].content)
+        analysis_text = state.get("analysis") or ""
 
         search_query = query_formulator.invoke(
             [
