@@ -11,6 +11,4 @@ Questions and observations about the original task description (`TASK_SPEC.md`),
 
 ## Still open
 
-- Exact multilingual `sentence-transformers` model to pin for Phase 3 embeddings (to be settled when Phase 3 is implemented).
-
-Resolved items have moved to `DECISIONS.md`.
+Nothing currently open. Resolved items have moved to `DECISIONS.md`.

@@ -69,3 +69,9 @@ In progress. See `CLARIFICATIONS.md` for the open questions driving these decisi
 - **Why:** Firing an unrequested business analysis and product recommendation the instant the 4th entity happens to be mentioned in casual conversation is presumptuous — entities can complete incidentally (e.g. during a product-search chat) without the user ever having asked for consultation. Gating on an explicit request keeps the assistant from talking over the user's actual intent, while still meeting the "fire immediately once appropriate" requirement from the earlier decision — "appropriate" now includes having been asked.
 - **Scope:** Flexible variant only. The rigid variant already gates consultation on `route_intent` classifying the turn as `consultation` before any entity questions are asked, so it has no equivalent "complete but unrequested" state to handle.
 - **Alternatives considered:** always firing on completion regardless of request (the prior behavior — simpler, but presumptuous per above); requiring an explicit request only, with no proactive offer (misses entities that complete silently mid-conversation, leaving the user without a natural next step).
+
+### 2026-09-23 — Phase 3 embedding model: `paraphrase-multilingual-MiniLM-L12-v2`
+
+- **Decision:** Pin `sentence-transformers`' `paraphrase-multilingual-MiniLM-L12-v2` as the Phase 3 embedding model.
+- **Why:** Small (~118MB) and fast enough for local CPU inference in a demo, while covering Persian among its 50+ supported languages — sufficient to catch semantic/synonym matches TF-IDF misses without needing GPU inference or an API call.
+- **Alternatives considered:** a larger multilingual model (e.g. `paraphrase-multilingual-mpnet-base-v2`) for better semantic accuracy, at the cost of slower local encoding — not worth it for a 29-product catalog where TF-IDF and embeddings are already being compared side by side rather than one being the final answer.
