@@ -5,15 +5,14 @@ asked for (or agreed to) a consultation — entity completeness alone is deliber
 see `docs/DECISIONS.md`'s 2026-09-22 "consultation firing requires an explicit request" entry.
 """
 
-from consultant_bot.common.entities import ENTITY_FIELDS, Entities
+from consultant_bot.common.entities import Entities
 from consultant_bot.flexible.state import State
 
 
 def completion_check(state: State) -> bool:
-    entities: Entities = state.get("entities", {})
-    all_present = all(entities.get(field) for field in ENTITY_FIELDS)
+    entities = state.get("entities") or Entities()
     return (
-        all_present
+        entities.is_complete()
         and state.get("consultation_requested", False)
         and not state.get("consultation_done", False)
     )

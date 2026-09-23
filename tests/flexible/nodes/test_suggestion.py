@@ -1,15 +1,13 @@
 from langchain_core.messages import AIMessage
 
+from consultant_bot.common.entities import Entities
 from consultant_bot.common.search.base import ProductHit
 from consultant_bot.common.search.products import Product
 from consultant_bot.flexible.nodes.suggestion import SearchQuery, build_suggestion_node
 
-COMPLETE_ENTITIES = {
-    "business_type": "کافه",
-    "customer_type": "B2C",
-    "location": "تهران",
-    "sales_channel": "اینستاگرام",
-}
+COMPLETE_ENTITIES = Entities(
+    business_type="کافه", customer_type="B2C", location="تهران", sales_channel="اینستاگرام"
+)
 
 
 def _product(product_id: int) -> Product:

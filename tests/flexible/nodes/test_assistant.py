@@ -4,6 +4,7 @@ from typing import Any
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
+from consultant_bot.common.entities import Entities
 from consultant_bot.common.search.base import ProductHit
 from consultant_bot.common.search.filter_search import FilterSearch
 from consultant_bot.common.search.products import Product, load_products
@@ -26,12 +27,9 @@ PRODUCT = Product(
     permalink="https://example.com/instagram",
 )
 
-COMPLETE_ENTITIES = {
-    "business_type": "کافه",
-    "customer_type": "B2C",
-    "location": "تهران",
-    "sales_channel": "اینستاگرام",
-}
+COMPLETE_ENTITIES = Entities(
+    business_type="کافه", customer_type="B2C", location="تهران", sales_channel="اینستاگرام"
+)
 
 
 def _state(**overrides):  # type: ignore[no-untyped-def]
@@ -50,8 +48,7 @@ def test_true_when_complete_and_unrequested_and_unoffered() -> None:
 
 
 def test_false_when_entities_incomplete() -> None:
-    entities = dict(COMPLETE_ENTITIES)
-    del entities["location"]
+    entities = COMPLETE_ENTITIES.model_copy(update={"location": None})
     assert is_complete_but_unrequested_and_unoffered(_state(entities=entities)) is False
 
 
@@ -96,7 +93,9 @@ def _search_call(call_id: str, query: str) -> dict[str, Any]:
 def _run_assistant(scripted: list[AIMessage], **state_overrides: Any) -> dict[str, Any]:
     llm = _ToolCallingFakeModel(messages=iter(scripted))
     node = build_assistant_node(llm, FilterSearch(load_products(FIXTURE_PATH)), top_k=5)
-    state = _state(entities={}, messages=[HumanMessage(content="سلام")], last_shown_products=None)
+    state = _state(
+        entities=Entities(), messages=[HumanMessage(content="سلام")], last_shown_products=None
+    )
     state.update(state_overrides)
     return node(state)  # type: ignore[no-any-return]
 

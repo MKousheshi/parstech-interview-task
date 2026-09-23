@@ -1,13 +1,11 @@
 from langgraph.graph import END
 
+from consultant_bot.common.entities import Entities
 from consultant_bot.flexible.graph import _route_after_assistant, build_graph
 
-COMPLETE_ENTITIES = {
-    "business_type": "کافه",
-    "customer_type": "B2C",
-    "location": "تهران",
-    "sales_channel": "اینستاگرام",
-}
+COMPLETE_ENTITIES = Entities(
+    business_type="کافه", customer_type="B2C", location="تهران", sales_channel="اینستاگرام"
+)
 
 
 def test_build_graph_wires_all_expected_nodes(monkeypatch) -> None:  # type: ignore[no-untyped-def]

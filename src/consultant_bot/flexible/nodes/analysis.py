@@ -14,16 +14,9 @@ from typing import Any
 from langchain_core.language_models import LanguageModelLike
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from consultant_bot.common.entities import ENTITY_FIELDS, Entities
+from consultant_bot.common.entities import Entities
 from consultant_bot.common.messages import message_text
 from consultant_bot.flexible.state import State
-
-ENTITY_LABELS: dict[str, str] = {
-    "business_type": "نوع کسب‌وکار",
-    "customer_type": "نوع مشتریان (B2B یا B2C)",
-    "location": "موقعیت جغرافیایی",
-    "sales_channel": "کانال فروش مجازی (وب‌سایت یا پیج)",
-}
 
 SYSTEM_PROMPT = """\
 تو یک مشاور کسب‌وکار هستی. صرفاً بر اساس دانش عمومی خودت (بدون دسترسی به هیچ کاتالوگ محصول یا \
@@ -33,18 +26,12 @@ SYSTEM_PROMPT = """\
 """
 
 
-def _entities_summary(entities: Entities) -> str:
-    return "\n".join(
-        f"- {ENTITY_LABELS[field]}: {entities[field]}"  # type: ignore[literal-required]
-        for field in ENTITY_FIELDS
-    )
-
-
 def build_analysis_node(llm: LanguageModelLike) -> Callable[[State], dict[str, Any]]:
     def analysis(state: State) -> dict[str, Any]:
-        entities: Entities = state.get("entities", {})
-        summary = _entities_summary(entities)
-        response = llm.invoke([SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=summary)])
+        entities = state.get("entities") or Entities()
+        response = llm.invoke(
+            [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=entities.summary())]
+        )
         text = response if isinstance(response, str) else message_text(response)
         return {"messages": [response], "analysis": text}
 

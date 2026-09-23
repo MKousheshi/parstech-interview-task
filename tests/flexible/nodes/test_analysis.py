@@ -1,13 +1,11 @@
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
+from consultant_bot.common.entities import Entities
 from consultant_bot.flexible.nodes.analysis import build_analysis_node
 
-COMPLETE_ENTITIES = {
-    "business_type": "کافه",
-    "customer_type": "B2C",
-    "location": "تهران",
-    "sales_channel": "اینستاگرام",
-}
+COMPLETE_ENTITIES = Entities(
+    business_type="کافه", customer_type="B2C", location="تهران", sales_channel="اینستاگرام"
+)
 
 
 class RecordingFakeLLM:
@@ -54,7 +52,7 @@ def test_analysis_summary_includes_all_four_entities() -> None:
     node({"messages": [], "entities": COMPLETE_ENTITIES, "last_shown_products": None})
 
     summary = fake_llm.received_messages[1].content  # type: ignore[index]
-    for value in COMPLETE_ENTITIES.values():
+    for value in COMPLETE_ENTITIES.known().values():
         assert value in summary
 
 

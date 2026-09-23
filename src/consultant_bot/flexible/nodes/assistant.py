@@ -28,13 +28,6 @@ from consultant_bot.flexible.tools.search_products import (
     build_search_products_tool,
 )
 
-ENTITY_LABELS: dict[str, str] = {
-    "business_type": "نوع کسب‌وکار",
-    "customer_type": "نوع مشتریان (B2B یا B2C)",
-    "location": "موقعیت جغرافیایی",
-    "sales_channel": "کانال فروش مجازی (وب‌سایت یا پیج)",
-}
-
 SYSTEM_PROMPT_TEMPLATE = """\
 تو دستیار فروشگاه محصولات دیجیتال مارکتینگ هستی و دو کار انجام می‌دهی: جست‌وجوی محصول، و کمک به \
 جمع‌آوری اطلاعات برای یک مشاوره کسب‌وکار. طبیعی و مفید صحبت کن؛ به هر چیزی که کاربر واقعاً گفته \
@@ -71,10 +64,9 @@ PROACTIVE_OFFER_INSTRUCTION = (
 
 def is_complete_but_unrequested_and_unoffered(state: State) -> bool:
     """The proactive-offer condition: computed in plain code, never left to the LLM to notice."""
-    entities: Entities = state.get("entities", {})
-    all_present = all(entities.get(field) for field in ENTITY_LABELS)
+    entities = state.get("entities") or Entities()
     return (
-        all_present
+        entities.is_complete()
         and not state.get("consultation_requested", False)
         and not state.get("consultation_done", False)
         and not state.get("consultation_offered", False)
@@ -82,19 +74,12 @@ def is_complete_but_unrequested_and_unoffered(state: State) -> bool:
 
 
 def _build_system_prompt(state: State) -> str:
-    entities: Entities = state.get("entities", {})
+    entities = state.get("entities") or Entities()
     known = (
-        "، ".join(
-            f"{label}: {entities[field]}"  # type: ignore[literal-required]
-            for field, label in ENTITY_LABELS.items()
-            if entities.get(field)
-        )
+        "، ".join(f"{label}: {value}" for label, value in entities.known().items())
         or "(هنوز هیچ‌کدام)"
     )
-    missing = (
-        "، ".join(label for field, label in ENTITY_LABELS.items() if not entities.get(field))
-        or "(هیچ)"
-    )
+    missing = "، ".join(entities.missing_labels()) or "(هیچ)"
     # Name, price and link — not just names: the follow-up questions this block exists to serve
     # ("how much is it?", "send me the link") can't be answered from a bare list of names.
     products_text = format_hits(state.get("last_shown_products") or []) or "(هیچ)"

@@ -20,7 +20,7 @@ from langchain_core.runnables import Runnable
 from pydantic import BaseModel, Field
 
 from consultant_bot.common.config import get_settings
-from consultant_bot.common.entities import ENTITY_FIELDS, Entities
+from consultant_bot.common.entities import Entities
 from consultant_bot.common.llm import build_chat_model
 from consultant_bot.common.search.base import (
     SearchStrategy,
@@ -28,13 +28,6 @@ from consultant_bot.common.search.base import (
     search_with_category_fallback,
 )
 from consultant_bot.flexible.state import State
-
-ENTITY_LABELS: dict[str, str] = {
-    "business_type": "نوع کسب‌وکار",
-    "customer_type": "نوع مشتریان (B2B یا B2C)",
-    "location": "موقعیت جغرافیایی",
-    "sales_channel": "کانال فروش مجازی (وب‌سایت یا پیج)",
-}
 
 # Strategy-appropriate relevance floors: FilterSearch already discards non-matches internally (any
 # hit it returns has score > 0 by construction), so 0.0 is effectively "any real match"; TF-IDF and
@@ -63,13 +56,6 @@ class SearchQuery(BaseModel):
     category: str | None = Field(default=None, description="نام دسته‌بندی حدسی، در صورت مشخص بودن")
 
 
-def _entities_summary(entities: Entities) -> str:
-    return "\n".join(
-        f"- {ENTITY_LABELS[field]}: {entities[field]}"  # type: ignore[literal-required]
-        for field in ENTITY_FIELDS
-    )
-
-
 def build_query_formulator() -> Runnable[Any, SearchQuery]:
     return build_chat_model().with_structured_output(SearchQuery)  # type: ignore[return-value]
 
@@ -89,15 +75,13 @@ def build_suggestion_node(
     )
 
     def suggestion(state: State) -> dict[str, Any]:
-        entities: Entities = state.get("entities", {})
+        entities = state.get("entities") or Entities()
         analysis_text = state.get("analysis") or ""
 
         search_query = query_formulator.invoke(
             [
                 SystemMessage(content=QUERY_FORMULATION_SYSTEM_PROMPT),
-                HumanMessage(
-                    content=f"{_entities_summary(entities)}\n\nتحلیل کسب‌وکار:\n{analysis_text}"
-                ),
+                HumanMessage(content=f"{entities.summary()}\n\nتحلیل کسب‌وکار:\n{analysis_text}"),
             ]
         )
 

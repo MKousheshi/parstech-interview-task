@@ -1,13 +1,11 @@
+from consultant_bot.common.entities import Entities
 from consultant_bot.flexible.nodes.completion_check import completion_check
 
-COMPLETE_ENTITIES = {
-    "business_type": "کافه",
-    "customer_type": "B2C",
-    "location": "تهران",
-    "sales_channel": "اینستاگرام",
-}
+COMPLETE_ENTITIES = Entities(
+    business_type="کافه", customer_type="B2C", location="تهران", sales_channel="اینستاگرام"
+)
 
-INCOMPLETE_ENTITIES = {"business_type": "کافه"}
+INCOMPLETE_ENTITIES = Entities(business_type="کافه")
 
 
 def _state(**overrides):  # type: ignore[no-untyped-def]

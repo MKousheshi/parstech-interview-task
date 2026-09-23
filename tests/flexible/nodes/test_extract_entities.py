@@ -1,5 +1,6 @@
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
+from consultant_bot.common.entities import Entities
 from consultant_bot.flexible.nodes.extract_entities import (
     RECENT_MESSAGES_WINDOW,
     ExtractedEntities,
@@ -21,7 +22,7 @@ class FakeExtractor:
 def _state(**overrides):  # type: ignore[no-untyped-def]
     base = {
         "messages": [HumanMessage(content="hi")],
-        "entities": {},
+        "entities": Entities(),
         "consultation_requested": False,
         "consultation_offered": False,
         "consultation_done": False,
@@ -65,7 +66,7 @@ def test_fills_entities_from_first_mention() -> None:
 
     update = node(_state())
 
-    assert update["entities"] == {"business_type": "کافه"}
+    assert update["entities"] == Entities(business_type="کافه")
     assert "consultation_requested" not in update
 
 
@@ -82,25 +83,25 @@ def test_merges_across_calls_leaving_unmentioned_fields_untouched() -> None:
     second_state = _state(entities=first_update["entities"])
     second_update = node(second_state)
 
-    assert second_update["entities"] == {"business_type": "کافه", "location": "تهران"}
+    assert second_update["entities"] == Entities(business_type="کافه", location="تهران")
 
 
 def test_overwrites_on_new_mention() -> None:
     extractor = FakeExtractor([ExtractedEntities(customer_type="B2B")])
     node = build_extract_entities_node(extractor)
 
-    update = node(_state(entities={"customer_type": "B2C"}))
+    update = node(_state(entities=Entities(customer_type="B2C")))
 
-    assert update["entities"]["customer_type"] == "B2B"
+    assert update["entities"].customer_type == "B2B"
 
 
 def test_vague_answer_leaves_field_unset() -> None:
     extractor = FakeExtractor([ExtractedEntities()])
     node = build_extract_entities_node(extractor)
 
-    update = node(_state(entities={"business_type": "کافه"}))
+    update = node(_state(entities=Entities(business_type="کافه")))
 
-    assert update["entities"] == {"business_type": "کافه"}
+    assert update["entities"] == Entities(business_type="کافه")
 
 
 def test_consultation_requested_is_set_when_extractor_detects_it() -> None:
@@ -127,7 +128,7 @@ def test_consultation_done_clears_when_entity_changes_after_completion() -> None
 
     update = node(
         _state(
-            entities={"customer_type": "B2C"},
+            entities=Entities(customer_type="B2C"),
             consultation_requested=True,
             consultation_done=True,
         )
@@ -142,7 +143,7 @@ def test_consultation_done_stays_true_when_nothing_changes() -> None:
 
     update = node(
         _state(
-            entities={"customer_type": "B2C"},
+            entities=Entities(customer_type="B2C"),
             consultation_requested=True,
             consultation_done=True,
         )

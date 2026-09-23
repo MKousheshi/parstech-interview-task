@@ -10,7 +10,7 @@ from typing import Any
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import Runnable
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from consultant_bot.common.entities import ENTITY_FIELDS, Entities
 from consultant_bot.common.llm import build_chat_model
@@ -35,11 +35,7 @@ SYSTEM_PROMPT = """\
 """
 
 
-class ExtractedEntities(BaseModel):
-    business_type: str | None = Field(default=None)
-    customer_type: str | None = Field(default=None)
-    location: str | None = Field(default=None)
-    sales_channel: str | None = Field(default=None)
+class ExtractedEntities(Entities):
     wants_consultation: bool = Field(default=False)
 
 
@@ -73,15 +69,17 @@ def build_extract_entities_node(
         recent_messages = recent_context(state["messages"])
         extracted = extractor.invoke([SystemMessage(content=SYSTEM_PROMPT), *recent_messages])
 
-        entities: Entities = dict(state.get("entities", {}))  # type: ignore[assignment]
-        changed = False
-        for entity_field in ENTITY_FIELDS:
-            value = getattr(extracted, entity_field)
-            if value and entities.get(entity_field) != value:
-                entities[entity_field] = value  # type: ignore[literal-required]
-                changed = True
+        entities = state.get("entities") or Entities()
+        # A field the extractor left empty means "not mentioned (clearly) this turn", never
+        # "clear it": only non-empty values that differ from what's stored are merged in.
+        changes = {
+            field: value
+            for field in ENTITY_FIELDS
+            if (value := extracted.value(field)) and value != entities.value(field)
+        }
+        changed = bool(changes)
 
-        update: dict[str, Any] = {"entities": entities}
+        update: dict[str, Any] = {"entities": entities.model_copy(update=changes)}
         if extracted.wants_consultation:
             update["consultation_requested"] = True
         if changed and state.get("consultation_done"):
