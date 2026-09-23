@@ -1,10 +1,9 @@
 """Conversation state for the flexible (agentic) architecture."""
 
-from typing import Annotated, NotRequired, TypedDict
+from typing import Annotated, TypedDict
 
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
-from langgraph.managed import RemainingSteps
 
 from consultant_bot.common.entities import Entities
 from consultant_bot.common.search.base import ProductHit
@@ -19,6 +18,3 @@ class State(TypedDict):
     last_shown_products: list[ProductHit] | None
     # The latest free-knowledge analysis text, written by `analysis` and read by `suggestion`.
     analysis: str | None
-    # Required by LangGraph's prebuilt create_react_agent (used inside the assistant node) when
-    # given a custom state_schema; it tracks the ReAct loop's remaining recursion budget.
-    remaining_steps: NotRequired[RemainingSteps]

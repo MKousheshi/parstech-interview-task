@@ -1,8 +1,9 @@
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.outputs import ChatResult
 
 from consultant_bot.common.entities import Entities
 from consultant_bot.common.search.base import ProductHit
@@ -80,10 +81,19 @@ def test_prompt_says_nothing_shown_yet_when_state_is_empty() -> None:
 
 
 class _ToolCallingFakeModel(GenericFakeChatModel):
-    """Replays scripted AI messages; `bind_tools` is a no-op since the tool calls are scripted."""
+    """Replays scripted AI messages; `bind_tools` is a no-op since the tool calls are scripted.
+
+    Records the messages of every model call, to check what the agent actually sent.
+    """
+
+    received: ClassVar[list[list[BaseMessage]]] = []
 
     def bind_tools(self, tools: Any, **kwargs: Any) -> "_ToolCallingFakeModel":
         return self
+
+    def _generate(self, messages: list[BaseMessage], *args: Any, **kwargs: Any) -> ChatResult:
+        self.received.append(list(messages))
+        return super()._generate(messages, *args, **kwargs)
 
 
 def _search_call(call_id: str, query: str) -> dict[str, Any]:
@@ -118,17 +128,28 @@ def test_parallel_search_calls_in_one_step_merge_into_last_shown_products() -> N
     assert len(shown_ids) == len(set(shown_ids))
 
 
-def test_turn_without_search_keeps_previous_last_shown_products() -> None:
+def test_turn_without_search_leaves_last_shown_products_untouched() -> None:
     previous = [ProductHit(product=PRODUCT, score=1.0)]
 
     result = _run_assistant(
         [AIMessage(content="قیمتش ۲.۵ میلیون است")], last_shown_products=previous
     )
 
-    assert result["last_shown_products"] == previous
+    assert "last_shown_products" not in result
 
 
 def test_searched_hits_is_none_without_a_search_and_empty_for_an_empty_search() -> None:
     assert searched_hits([AIMessage(content="سلام")]) is None
     empty_search = ToolMessage(content="", tool_call_id="a", name="search_products", artifact=[])
     assert searched_hits([empty_search]) == []
+
+
+def test_every_model_call_gets_a_system_prompt_built_from_current_state() -> None:
+    _ToolCallingFakeModel.received = []
+
+    _run_assistant([AIMessage(content="سلام!")], entities=Entities(business_type="کافه"))
+
+    [call] = _ToolCallingFakeModel.received
+    assert isinstance(call[0], SystemMessage)
+    assert "کافه" in call[0].content
+    assert call[1].content == "سلام"

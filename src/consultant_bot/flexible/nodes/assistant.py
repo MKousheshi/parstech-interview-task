@@ -1,24 +1,21 @@
 """assistant node: the flexible variant's conversational core.
 
-A tool-calling LLM node (LangGraph's prebuilt ReAct-style loop) with `search_products` as its only
-tool. See `docs/ARCHITECTURE_FLEXIBLE.md`'s `assistant` section for the full behavioral spec this
-implements: answering whatever the user actually said (chat, product query, follow-up, off-topic),
-decomposing compound search requests into multiple tool calls, never pre-empting the dedicated
-analysis/suggestion pair, and proactively offering a consultation once entities are complete but
-unrequested and unoffered.
+A tool-calling LLM node (LangChain's `create_agent` ReAct-style loop) with `search_products` as its
+only tool; its system prompt is rebuilt from current state before every model call via a
+`dynamic_prompt` middleware. See `docs/ARCHITECTURE_FLEXIBLE.md`'s `assistant` section for the full
+behavioral spec this implements: answering whatever the user actually said (chat, product query,
+follow-up, off-topic), decomposing compound search requests into multiple tool calls, never
+pre-empting the dedicated analysis/suggestion pair, and proactively offering a consultation once
+entities are complete but unrequested and unoffered.
 """
 
 from collections.abc import Callable, Sequence
-from typing import Any
+from typing import Any, NotRequired
 
-from langchain_core.language_models import LanguageModelLike
-from langchain_core.messages import BaseMessage, SystemMessage, ToolMessage
-
-# Deprecated in favor of langchain.agents.create_agent, but that replacement only takes a static
-# system_prompt (str/SystemMessage) rather than a per-invocation callable — this node needs the
-# dynamic prompt to reflect current entity/consultation state each turn, so sticking with this
-# (still fully functional, just flagged for removal in LangGraph v2.0) rather than losing that.
-from langgraph.prebuilt import create_react_agent
+from langchain.agents import AgentState, create_agent
+from langchain.agents.middleware import ModelRequest, dynamic_prompt
+from langchain_core.language_models import BaseChatModel
+from langchain_core.messages import BaseMessage, ToolMessage
 
 from consultant_bot.common.entities import Entities
 from consultant_bot.common.search.base import ProductHit, SearchStrategy, format_hits
@@ -121,29 +118,47 @@ def searched_hits(messages: Sequence[BaseMessage]) -> list[ProductHit] | None:
     return hits
 
 
-def _prompt(state: State) -> list[BaseMessage]:
-    return [SystemMessage(content=_build_system_prompt(state)), *state["messages"]]
+class _AgentLoopState(AgentState[Any]):
+    """The agent loop's own state: its messages, plus the parent fields the system prompt reads."""
+
+    entities: NotRequired[Entities]
+    consultation_requested: NotRequired[bool]
+    consultation_offered: NotRequired[bool]
+    consultation_done: NotRequired[bool]
+    last_shown_products: NotRequired[list[ProductHit] | None]
+
+
+_AGENT_LOOP_KEYS = frozenset(_AgentLoopState.__annotations__)
+
+
+@dynamic_prompt
+def _system_prompt(request: ModelRequest) -> str:
+    return _build_system_prompt(request.state)  # type: ignore[arg-type]
 
 
 def build_assistant_node(
-    llm: LanguageModelLike, search_strategy: SearchStrategy, *, top_k: int
+    llm: BaseChatModel, search_strategy: SearchStrategy, *, top_k: int
 ) -> Callable[[State], dict[str, Any]]:
     search_tool = build_search_products_tool(search_strategy, top_k=top_k)
-    react_agent = create_react_agent(
+    agent = create_agent(
         model=llm,
         tools=[search_tool],
-        prompt=_prompt,
-        state_schema=State,
+        middleware=[_system_prompt],
+        state_schema=_AgentLoopState,
     )
 
     def assistant(state: State) -> dict[str, Any]:
         should_offer = is_complete_but_unrequested_and_unoffered(state)
-        result: dict[str, Any] = react_agent.invoke(state)
-        hits = searched_hits(result["messages"][len(state["messages"]) :])
+        agent_input = {key: value for key, value in state.items() if key in _AGENT_LOOP_KEYS}
+        result = agent.invoke(agent_input)  # type: ignore[call-overload]
+        new_messages = result["messages"][len(state["messages"]) :]
+
+        update: dict[str, Any] = {"messages": new_messages}
+        hits = searched_hits(new_messages)
         if hits is not None:
-            result["last_shown_products"] = hits
+            update["last_shown_products"] = hits
         if should_offer:
-            result["consultation_offered"] = True
-        return result
+            update["consultation_offered"] = True
+        return update
 
     return assistant
