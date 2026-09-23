@@ -44,3 +44,23 @@ def test_ranking_prefers_products_matching_more_query_tokens(products: list[Prod
 def test_top_k_limits_result_count(products: list[Product]) -> None:
     hits = FilterSearch(products).search("مشاوره", top_k=1)
     assert len(hits) == 1
+
+
+def test_stopwords_alone_do_not_match_anything(products: list[Product]) -> None:
+    assert FilterSearch(products).search("و در برای از") == []
+
+
+def test_stopwords_do_not_dilute_the_score_of_a_real_match(products: list[Product]) -> None:
+    hits = FilterSearch(products).search("برای تلگرام و")
+    assert [(hit.product.id, hit.score) for hit in hits] == [(7569, 1.0)]
+
+
+def test_arabic_letter_variants_match_their_persian_forms(products: list[Product]) -> None:
+    # "اینستاگرام" typed with Arabic yeh (ي) still finds the Persian-spelled product.
+    hits = FilterSearch(products).search("اينستاگرام")
+    assert 9177 in [hit.product.id for hit in hits]
+
+
+def test_zwnj_and_space_spellings_match_the_same_products(products: list[Product]) -> None:
+    search = FilterSearch(products)
+    assert search.search("تلگرام می\u200cخواهم") == search.search("تلگرام میخواهم")
