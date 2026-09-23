@@ -19,7 +19,6 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import Runnable
 from pydantic import BaseModel, Field
 
-from consultant_bot.common.config import get_settings
 from consultant_bot.common.entities import Entities
 from consultant_bot.common.llm import build_chat_model
 from consultant_bot.common.search.base import (
@@ -28,11 +27,6 @@ from consultant_bot.common.search.base import (
     search_with_category_fallback,
 )
 from consultant_bot.flexible.state import State
-
-# Strategy-appropriate relevance floors: FilterSearch already discards non-matches internally (any
-# hit it returns has score > 0 by construction), so 0.0 is effectively "any real match"; TF-IDF and
-# embedding scores are cosine similarities, where low-single-digit-percent scores are noise.
-RELEVANCE_THRESHOLDS: dict[str, float] = {"filter": 0.0, "tfidf": 0.1, "embedding": 0.2}
 
 NO_RESULTS_MESSAGE = (
     "متأسفانه در حال حاضر محصول یا بسته مرتبطی در فروشگاه برای این نیاز پیدا نکردم."
@@ -68,11 +62,7 @@ def build_suggestion_node(
     top_k: int,
     relevance_threshold: float | None = None,
 ) -> Callable[[State], dict[str, Any]]:
-    threshold = (
-        RELEVANCE_THRESHOLDS[get_settings().search_strategy]
-        if relevance_threshold is None
-        else relevance_threshold
-    )
+    threshold = strategy.relevance_threshold if relevance_threshold is None else relevance_threshold
 
     def suggestion(state: State) -> dict[str, Any]:
         entities = state.get("entities") or Entities()

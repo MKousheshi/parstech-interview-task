@@ -1,4 +1,4 @@
-"""Search strategy interface shared by all product search implementations."""
+"""Search strategy interface and the helpers shared by all product search implementations."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -14,9 +14,37 @@ class ProductHit:
 
 
 class SearchStrategy(Protocol):
+    @property
+    def relevance_threshold(self) -> float:
+        """Scores at or below this are noise for this strategy's scoring scale.
+
+        Scales differ per strategy (a keyword-match fraction vs. a cosine similarity), so the
+        floor a caller applies has to come from the strategy it's actually holding.
+        """
+        ...
+
     def search(
         self, query: str, category: str | None = None, top_k: int = 5
     ) -> list[ProductHit]: ...
+
+
+def product_text(product: Product) -> str:
+    """The text every strategy searches over: name, descriptions and category names."""
+    return " ".join(
+        [product.name, product.description, product.short_description, *product.categories]
+    )
+
+
+def category_indices(products: Sequence[Product], category: str | None) -> list[int]:
+    """Indices of the products in `category` (case-insensitive substring), or all if `None`."""
+    if not category:
+        return list(range(len(products)))
+    category_lower = category.lower()
+    return [
+        i
+        for i, product in enumerate(products)
+        if any(category_lower in c.lower() for c in product.categories)
+    ]
 
 
 def search_with_category_fallback(

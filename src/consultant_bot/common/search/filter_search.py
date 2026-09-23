@@ -4,46 +4,44 @@ Query tokens are normalized and stripped of Persian stopwords first (see `text.p
 words like "و" or "در" substring-match almost every product and every query scores as relevant.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import ClassVar
 
-from consultant_bot.common.search.base import ProductHit
+from consultant_bot.common.search.base import ProductHit, category_indices, product_text
 from consultant_bot.common.search.products import Product
 from consultant_bot.common.search.text import keyword_tokens, normalize
-
-
-def _haystack(product: Product) -> str:
-    fields = [product.name, product.description, product.short_description, *product.categories]
-    return normalize(" ".join(fields))
 
 
 @dataclass
 class FilterSearch:
     """Bare-minimum keyword search: no ranking sophistication, just substring matching."""
 
+    # Any hit this returns already matched at least one token (score > 0 by construction), so
+    # 0.0 means "any real match".
+    relevance_threshold: ClassVar[float] = 0.0
+
     products: list[Product]
+    _haystacks: list[str] = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        self._haystacks = [normalize(product_text(product)) for product in self.products]
 
     def search(self, query: str, category: str | None = None, top_k: int = 5) -> list[ProductHit]:
-        candidates = self.products
-        if category:
-            category_lower = category.lower()
-            candidates = [
-                p for p in candidates if any(category_lower in c.lower() for c in p.categories)
-            ]
+        indices = category_indices(self.products, category)
 
         if not query.strip():
-            return [ProductHit(product=p, score=1.0) for p in candidates][:top_k]
+            return [ProductHit(product=self.products[i], score=1.0) for i in indices][:top_k]
 
         tokens = keyword_tokens(query)
         if not tokens:
             return []
 
         hits = []
-        for product in candidates:
-            haystack = _haystack(product)
-            matched = sum(1 for token in tokens if token in haystack)
+        for i in indices:
+            matched = sum(1 for token in tokens if token in self._haystacks[i])
             if matched == 0:
                 continue
-            hits.append(ProductHit(product=product, score=matched / len(tokens)))
+            hits.append(ProductHit(product=self.products[i], score=matched / len(tokens)))
 
         hits.sort(key=lambda hit: hit.score, reverse=True)
         return hits[:top_k]

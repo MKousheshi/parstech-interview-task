@@ -11,6 +11,7 @@ from langgraph.graph.state import CompiledStateGraph
 
 from consultant_bot.common.config import get_settings
 from consultant_bot.common.llm import build_chat_model
+from consultant_bot.common.search.registry import build_active_strategy
 from consultant_bot.flexible.nodes.analysis import build_analysis_node
 from consultant_bot.flexible.nodes.assistant import build_assistant_node
 from consultant_bot.flexible.nodes.completion_check import completion_check
@@ -20,7 +21,6 @@ from consultant_bot.flexible.nodes.extract_entities import (
 )
 from consultant_bot.flexible.nodes.suggestion import build_query_formulator, build_suggestion_node
 from consultant_bot.flexible.state import State
-from consultant_bot.flexible.tools.search_products import build_active_strategy
 
 
 def _route_after_assistant(state: State) -> str:

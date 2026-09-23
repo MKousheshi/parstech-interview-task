@@ -7,35 +7,14 @@ calls in a single step, where several writes to the same state key are rejected 
 `assistant` node instead folds every artifact from the turn into one `last_shown_products` update.
 """
 
-from collections.abc import Callable
-
 from langchain_core.tools import BaseTool, tool
 
-from consultant_bot.common.config import get_settings
 from consultant_bot.common.search.base import (
     ProductHit,
     SearchStrategy,
     format_hits,
     search_with_category_fallback,
 )
-from consultant_bot.common.search.embedding_search import EmbeddingSearch
-from consultant_bot.common.search.filter_search import FilterSearch
-from consultant_bot.common.search.products import Product, load_products
-from consultant_bot.common.search.tfidf_search import TfidfSearch
-
-_STRATEGY_BUILDERS: dict[str, Callable[[list[Product]], SearchStrategy]] = {
-    "filter": FilterSearch,
-    "tfidf": TfidfSearch,
-    "embedding": EmbeddingSearch,
-}
-
-
-def build_active_strategy() -> SearchStrategy:
-    """Builds the `SearchStrategy` named by `CONSULTANT_BOT_SEARCH_STRATEGY` over the catalog."""
-    products = load_products()
-    builder = _STRATEGY_BUILDERS[get_settings().search_strategy]
-    return builder(products)
-
 
 SEARCH_PRODUCTS_TOOL_NAME = "search_products"
 

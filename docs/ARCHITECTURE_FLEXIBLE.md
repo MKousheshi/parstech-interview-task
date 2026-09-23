@@ -31,7 +31,10 @@ src/consultant_bot/
     messages.py               # reply_texts(): the AI replies a turn appended, for the web UI
     search/
       products.py             # loads + cleans products.json into Product records
-      base.py                  # SearchStrategy protocol + ProductHit dataclass + format_hits()
+      base.py                  # SearchStrategy protocol + ProductHit + shared helpers (product_text,
+                                # category_indices, search_with_category_fallback, format_hits)
+      text.py                   # Persian normalization + stopword-aware keyword tokenization
+      registry.py               # build_strategy()/build_active_strategy(); embedding imported lazily
       filter_search.py          # Phase 1: keyword/substring + category filter
       tfidf_search.py            # Phase 2: TF-IDF + cosine similarity
       embedding_search.py         # Phase 3: sentence-transformers semantic search
@@ -103,7 +106,7 @@ flowchart TD
 - **`analysis`** — LLM call using **only** the 4 collected entities, no product data in context, and no general knowledge base. Built from a fresh, purpose-built prompt (system instructions + a synthetic summary of the 4 entities) on a plain, non-tool-bound LLM instance — deliberately **not** a continuation of `state["messages"]` and **not** the same tool-bound model object as `assistant`, so neither prior product search results sitting in the conversation history nor the search tool itself can leak into this call. This isolation is structural, not just a prompting convention, since it's a documented hard requirement.
 - **`suggestion`** — two internal steps, both deterministic in sequence:
   1. **Query formulation** — a small LLM call turns the 4 entities plus the analysis text into a short, focused product-search query (and an optional category guess), rather than concatenating fields verbatim. The category is only a guess (the LLM isn't shown the real category list), so both this node and the `search_products` tool go through `common/search/base.py:search_with_category_fallback()`, which retries without the category when filtering by it finds nothing. This is the step that actually connects "business type / B2B-B2C / location / channel" to something a search strategy can usefully match against the catalog.
-  2. **Retrieval + grounded formatting** — calls `search_products` directly (not through the assistant's tool loop) with that query, applies a minimum relevance threshold to the hits (strategy-appropriate: a non-zero match count for filter search, a cosine-similarity floor for TF-IDF/embeddings), and only then runs a second LLM call that formats a recommendation using *only* the hits that cleared the threshold (product names/prices/links passed in context, with an instruction not to invent products). If nothing clears the threshold, the LLM call is told to say so honestly rather than write up a forced, low-relevance list.
+  2. **Retrieval + grounded formatting** — calls `search_products` directly (not through the assistant's tool loop) with that query, applies a minimum relevance threshold to the hits (the strategy's own `relevance_threshold`: a non-zero match count for filter search, a cosine-similarity floor for TF-IDF/embeddings), and only then runs a second LLM call that formats a recommendation using *only* the hits that cleared the threshold (product names/prices/links passed in context, with an instruction not to invent products). If nothing clears the threshold, the LLM call is told to say so honestly rather than write up a forced, low-relevance list.
 
   Sets `consultation_done = True` and updates `last_shown_products` regardless of whether any hit cleared the threshold — the consultation itself is still considered complete.
 
@@ -117,6 +120,8 @@ Because `completion_check` runs after the assistant's own reply, whenever a sing
 
 ```python
 class SearchStrategy(Protocol):
+    @property
+    def relevance_threshold(self) -> float: ...  # noise floor on this strategy's own score scale
     def search(self, query: str, category: str | None = None, top_k: int = 5) -> list[ProductHit]: ...
 
 @dataclass
@@ -125,7 +130,7 @@ class ProductHit:
     score: float
 ```
 
-Three interchangeable implementations (filter/keyword, TF-IDF, embeddings — see `ARCHITECTURE_RIGID.md` for the per-phase detail, identical here) live behind this protocol. `config.py` selects the active one; `flexible/tools/search_products.py` wraps it as a LangChain tool that returns its hits as the `ToolMessage` artifact, which the `assistant` node folds into `state.last_shown_products`. `common/search/eval.py` runs a fixed set of realistic Persian queries — including a compound/multi-facet one issued as a single call, to show how each phase's single-query-vector ranking degrades on it standalone — against every implemented strategy side by side.
+Three interchangeable implementations (filter/keyword, TF-IDF, embeddings — see `ARCHITECTURE_RIGID.md` for the per-phase detail, identical here) live behind this protocol. `config.py` names the active one and `common/search/registry.py` builds it (importing the embedding strategy — and with it `sentence-transformers`/`torch` — only when that's the one selected); `flexible/tools/search_products.py` wraps it as a LangChain tool that returns its hits as the `ToolMessage` artifact, which the `assistant` node folds into `state.last_shown_products`. `common/search/eval.py` runs a fixed set of realistic Persian queries — including a compound/multi-facet one issued as a single call, to show how each phase's single-query-vector ranking degrades on it standalone — against every implemented strategy side by side.
 
 ## Web UI / session model
 

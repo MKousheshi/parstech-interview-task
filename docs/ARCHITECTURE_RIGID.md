@@ -26,7 +26,10 @@ src/consultant_bot/
     entities.py              # shared Entities schema (business_type, customer_type, location, sales_channel)
     search/
       products.py             # loads + cleans products.json into Product records
-      base.py                  # SearchStrategy protocol + ProductHit dataclass
+      base.py                  # SearchStrategy protocol + ProductHit + shared helpers (product_text,
+                                # category_indices, search_with_category_fallback, format_hits)
+      text.py                   # Persian normalization + stopword-aware keyword tokenization
+      registry.py               # build_strategy()/build_active_strategy(); embedding imported lazily
       filter_search.py          # Phase 1: keyword/substring + category filter
       tfidf_search.py            # Phase 2: TF-IDF + cosine similarity
       embedding_search.py         # Phase 3: sentence-transformers semantic search
@@ -103,6 +106,8 @@ Identical to the flexible variant: `common/search/products.py` loads `products.j
 
 ```python
 class SearchStrategy(Protocol):
+    @property
+    def relevance_threshold(self) -> float: ...  # noise floor on this strategy's own score scale
     def search(self, query: str, category: str | None = None, top_k: int = 5) -> list[ProductHit]: ...
 
 @dataclass

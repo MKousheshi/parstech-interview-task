@@ -405,6 +405,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "gradio" },
+    { name = "huggingface-hub" },
     { name = "langchain" },
     { name = "langchain-openai" },
     { name = "langgraph" },
@@ -425,6 +426,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "gradio", specifier = ">=6.28.0" },
+    { name = "huggingface-hub", specifier = ">=1.32.0" },
     { name = "langchain", specifier = ">=1.4.2" },
     { name = "langchain-openai", specifier = ">=1.6.3" },
     { name = "langgraph", specifier = ">=1.2.12" },

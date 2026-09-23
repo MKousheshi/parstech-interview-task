@@ -1,19 +1,14 @@
 """Phase 2 search strategy: TF-IDF vectorization + cosine similarity ranking."""
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, ClassVar
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-from consultant_bot.common.search.base import ProductHit
+from consultant_bot.common.search.base import ProductHit, category_indices, product_text
 from consultant_bot.common.search.products import Product
-
-
-def _document(product: Product) -> str:
-    return " ".join(
-        [product.name, product.description, product.short_description, *product.categories]
-    )
+from consultant_bot.common.search.text import normalize
 
 
 @dataclass
@@ -21,27 +16,25 @@ class TfidfSearch:
     """Ranks products by cosine similarity between the query and each product's TF-IDF vector.
 
     Category names are folded into the corpus text rather than handled separately, so a
-    free-text query mentioning a category naturally contributes to relevance.
+    free-text query mentioning a category naturally contributes to relevance. Text goes through
+    the same Persian normalization as filter search, so letter variants and ZWNJ spellings of a
+    word land on the same term.
     """
+
+    # Cosine similarity: low-single-digit-percent scores are noise.
+    relevance_threshold: ClassVar[float] = 0.1
 
     products: list[Product]
     _vectorizer: TfidfVectorizer = field(init=False, repr=False)
     _matrix: Any = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        self._vectorizer = TfidfVectorizer()
-        documents = [_document(product) for product in self.products]
+        self._vectorizer = TfidfVectorizer(preprocessor=normalize)
+        documents = [product_text(product) for product in self.products]
         self._matrix = self._vectorizer.fit_transform(documents)
 
     def search(self, query: str, category: str | None = None, top_k: int = 5) -> list[ProductHit]:
-        indices = list(range(len(self.products)))
-        if category:
-            category_lower = category.lower()
-            indices = [
-                i
-                for i in indices
-                if any(category_lower in c.lower() for c in self.products[i].categories)
-            ]
+        indices = category_indices(self.products, category)
         if not indices:
             return []
 

@@ -33,6 +33,8 @@ class FakeQueryFormulator:
 
 
 class FakeSearchStrategy:
+    relevance_threshold = 0.3
+
     def __init__(self, hits: list[ProductHit]) -> None:
         self.hits = hits
         self.received_query: str | None = None
@@ -150,3 +152,17 @@ def test_query_formulation_reads_the_analysis_field_not_the_last_message() -> No
     prompt = formulator.received_messages[1].content  # type: ignore[index]
     assert "تحلیل کسب‌وکار شما این است..." in prompt
     assert "پیام نامرتبط بعدی" not in prompt
+
+
+def test_threshold_defaults_to_the_strategys_own_relevance_threshold() -> None:
+    # 0.2 clears a 0.1 floor but not FakeSearchStrategy's own 0.3 one.
+    strategy = FakeSearchStrategy([ProductHit(product=_product(1), score=0.2)])
+    formatter = RecordingFakeLLM(AIMessage(content=""))
+    node = build_suggestion_node(
+        FakeQueryFormulator(SearchQuery(query="کافه")), strategy, formatter, top_k=5
+    )
+
+    result = node(_state())
+
+    assert formatter.was_called is False
+    assert result["last_shown_products"] == []

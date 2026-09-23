@@ -33,6 +33,8 @@ def test_format_hits_writes_one_line_per_hit() -> None:
 class _CategoryAwareStrategy:
     """Finds `PRODUCT` for any query, but only when the category is absent or "اینستاگرام"."""
 
+    relevance_threshold = 0.0
+
     def __init__(self) -> None:
         self.categories_searched: list[str | None] = []
 

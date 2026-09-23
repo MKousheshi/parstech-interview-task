@@ -7,34 +7,38 @@ demo where semantic recall matters more than state-of-the-art multilingual STS b
 """
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, ClassVar
 
+from huggingface_hub import snapshot_download
+from huggingface_hub.errors import LocalEntryNotFoundError
 from sentence_transformers import SentenceTransformer
 
-from consultant_bot.common.search.base import ProductHit
+from consultant_bot.common.search.base import ProductHit, category_indices, product_text
 from consultant_bot.common.search.products import Product
 
 EMBEDDING_MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
 
 
 def is_model_cached(model_name: str = EMBEDDING_MODEL_NAME) -> bool:
-    """Checks whether `model_name` is already cached locally, without touching the network."""
+    """Checks whether `model_name` is in the local Hugging Face cache, without loading it or
+    touching the network. Bare names resolve under `sentence-transformers/`, as they do for
+    `SentenceTransformer` itself.
+    """
+    repo_id = model_name if "/" in model_name else f"sentence-transformers/{model_name}"
     try:
-        SentenceTransformer(model_name, local_files_only=True, device="cpu")
-    except Exception:
+        snapshot_download(repo_id, local_files_only=True)
+    except LocalEntryNotFoundError:
         return False
     return True
-
-
-def _document(product: Product) -> str:
-    return " ".join(
-        [product.name, product.description, product.short_description, *product.categories]
-    )
 
 
 @dataclass
 class EmbeddingSearch:
     """Ranks products by cosine similarity between query and product sentence embeddings."""
+
+    # Cosine similarity between sentence embeddings, which runs higher than TF-IDF's for
+    # unrelated text; below this it's noise.
+    relevance_threshold: ClassVar[float] = 0.2
 
     products: list[Product]
     model_name: str = EMBEDDING_MODEL_NAME
@@ -46,20 +50,13 @@ class EmbeddingSearch:
         # sentence-transformers auto-pick CUDA breaks on GPUs the installed torch build doesn't
         # have kernels for (e.g. older compute-capability cards).
         self._model = SentenceTransformer(self.model_name, device="cpu")
-        documents = [_document(product) for product in self.products]
+        documents = [product_text(product) for product in self.products]
         self._embeddings = self._model.encode(
             documents, normalize_embeddings=True, convert_to_numpy=True
         )
 
     def search(self, query: str, category: str | None = None, top_k: int = 5) -> list[ProductHit]:
-        indices = list(range(len(self.products)))
-        if category:
-            category_lower = category.lower()
-            indices = [
-                i
-                for i in indices
-                if any(category_lower in c.lower() for c in self.products[i].categories)
-            ]
+        indices = category_indices(self.products, category)
         if not indices:
             return []
 
