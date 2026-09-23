@@ -1,8 +1,8 @@
 """ask_entity node: the fixed question for the next unset entity, in the spec's literal order.
 
 Zero LLM calls. Sets `awaiting_field`, so `route_intent` can recognize the user's next message
-as the answer, which `capture_entity` then stores verbatim. Asking again while that question is
-still open (a consultation request mid-consultation) just repeats it.
+as the answer for `capture_entity` to record. Fields the user already stated are skipped, and
+asking again while a question is still open (a consultation request mid-consultation) repeats it.
 """
 
 from typing import Any

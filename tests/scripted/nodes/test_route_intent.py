@@ -1,6 +1,7 @@
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
+from consultant_bot.common.entities import Entities
 from consultant_bot.scripted.nodes.ask_entity import QUESTIONS
 from consultant_bot.scripted.nodes.route_intent import (
     SYSTEM_PROMPT,
@@ -10,7 +11,7 @@ from consultant_bot.scripted.nodes.route_intent import (
     system_prompt,
 )
 from consultant_bot.scripted.state import Intent, State
-from tests.support import COMPLETE_ENTITIES, ScriptedRunnable
+from tests.support import ScriptedRunnable
 
 
 def test_classifies_only_the_latest_user_message() -> None:
@@ -27,15 +28,16 @@ def test_classifies_only_the_latest_user_message() -> None:
         }
     )
 
-    assert result == {"intent": "search"}
+    assert result == {"intent": "search", "stated_entities": Entities()}
     [received] = classifier.inputs
     assert isinstance(received[0], SystemMessage)
     assert [m.content for m in received[1:]] == ["یک محصول تلگرامی می‌خوام"]
 
 
 def test_answer_is_only_offered_while_a_question_is_pending() -> None:
-    assert system_prompt({"messages": []}) == SYSTEM_PROMPT
-    assert "answer" not in SYSTEM_PROMPT
+    idle = system_prompt({"messages": []})
+    assert "answer" not in idle
+    assert "business_type" in idle  # entities are extracted either way
 
     pending = system_prompt({"messages": [], "awaiting_field": "location"})
     assert pending.startswith(SYSTEM_PROMPT)
@@ -49,9 +51,20 @@ def test_the_pending_question_reaches_the_classifier() -> None:
 
     result = node({"messages": [HumanMessage(content="تهران")], "awaiting_field": "location"})
 
-    assert result == {"intent": "answer"}
+    assert result["intent"] == "answer"
     [received] = classifier.inputs
     assert QUESTIONS["location"] in received[0].content
+
+
+def test_the_stated_entities_are_reported_without_the_label() -> None:
+    label = IntentLabel(intent="consultation", business_type="کافه", location="null")
+    node = build_route_intent_node(ScriptedRunnable(label))
+
+    result = node({"messages": [HumanMessage(content="کافه دارم، مشاوره می‌خوام")]})
+
+    # A placeholder like "null" counts as not stated.
+    assert result["stated_entities"] == Entities(business_type="کافه")
+    assert type(result["stated_entities"]) is not IntentLabel
 
 
 def test_an_answer_is_captured_only_while_a_field_is_pending() -> None:
@@ -65,7 +78,7 @@ def test_an_answer_is_captured_only_while_a_field_is_pending() -> None:
     [
         ("search", False, "product_search"),
         ("unclear", False, "fallback"),
-        ("consultation", False, "ask_entity"),
+        ("consultation", False, "capture_entity"),
         ("consultation", True, "idle_reply"),
         ("search", True, "product_search"),
     ],
@@ -74,12 +87,6 @@ def test_route_after_intent(intent: Intent, consultation_done: bool, expected: s
     state: State = {"messages": [], "intent": intent, "consultation_done": consultation_done}
 
     assert route_after_intent(state) == expected
-
-
-def test_consultation_with_all_entities_but_not_done_retries_the_analysis() -> None:
-    state: State = {"messages": [], "intent": "consultation", "entities": COMPLETE_ENTITIES}
-
-    assert route_after_intent(state) == "analysis"
 
 
 def test_route_after_intent_falls_back_without_a_label() -> None:

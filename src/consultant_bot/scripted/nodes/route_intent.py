@@ -9,10 +9,10 @@ that question, since a bare "تهران" can't be told apart from a search witho
 off-topic message mid-consultation is handled as such instead of being stored as the entity, and the
 pending question stays open for a later turn.
 
-A consultation request normally goes to `ask_entity`. The exception is a consultation whose 4
-answers were all captured but whose analysis or suggestion call then failed (a timeout, a rate
-limit): the entities are saved but `consultation_done` never got set. There is no field left to
-ask for, so the request goes straight to `analysis` and the consultation is retried.
+The same call also reports which of the 4 entities the message states (`stated_entities`), so "I
+run a cafe in Tehran, B2C, selling on Instagram — advise me" needs no follow-up questions.
+`capture_entity` merges them, but only on an `answer` or `consultation` turn: an entity mentioned in
+a search ("site design for a cafe") isn't taken as the user's own business.
 """
 
 import logging
@@ -21,9 +21,9 @@ from typing import Any
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import Runnable
-from pydantic import BaseModel, Field
+from pydantic import Field
 
-from consultant_bot.common.entities import Entities
+from consultant_bot.common.entities import ENTITY_FIELDS, Entities, ReportedEntities
 from consultant_bot.common.messages import latest_user_text
 from consultant_bot.scripted.nodes.ask_entity import QUESTIONS
 from consultant_bot.scripted.state import Intent, Node, State
@@ -48,8 +48,19 @@ ANSWER_PROMPT = """
 کانال فروش). اگر پیام پاسخ این سؤال است، answer را انتخاب کن، نه search.\
 """
 
+ENTITIES_PROMPT = """
 
-class IntentLabel(BaseModel):
+همچنین هر کدام از ۴ ویژگی زیر را که کاربر در همین پیام صراحتاً درباره کسب‌وکار خودش گفته، کوتاه \
+استخراج کن و بقیه را خالی (null) بگذار. چیزی را حدس نزن:
+
+- business_type: نوع کسب‌وکار (مثلاً کافه)
+- customer_type: نوع مشتریان، B2B یا B2C
+- location: موقعیت جغرافیایی (مثلاً تهران)
+- sales_channel: کانال فروش مجازی (مثلاً وب‌سایت یا پیج اینستاگرام)\
+"""
+
+
+class IntentLabel(ReportedEntities):
     intent: Intent = Field(
         description="دسته پیام کاربر: answer (فقط وقتی سؤالی منتظر پاسخ است)، search، "
         "consultation یا unclear"
@@ -63,9 +74,8 @@ def build_default_classifier(llm: BaseChatModel) -> Runnable[Any, IntentLabel]:
 def system_prompt(state: State) -> str:
     """The classifier's instructions, with the `answer` label added while a question is pending."""
     field = state.get("awaiting_field")
-    if field is None:
-        return SYSTEM_PROMPT
-    return SYSTEM_PROMPT + ANSWER_PROMPT.format(question=QUESTIONS[field])
+    answer = "" if field is None else ANSWER_PROMPT.format(question=QUESTIONS[field])
+    return SYSTEM_PROMPT + answer + ENTITIES_PROMPT
 
 
 def build_route_intent_node(
@@ -76,8 +86,11 @@ def build_route_intent_node(
         label = classifier.invoke(
             [SystemMessage(content=system_prompt(state)), HumanMessage(content=text)]
         )
-        logger.info("classified intent: %s", label.intent)
-        return {"intent": label.intent}
+        stated = Entities(**label.model_dump(include=set(ENTITY_FIELDS)))
+        # Field names only at INFO: the values are the user's own words.
+        named = [field for field in ENTITY_FIELDS if stated.value(field)]
+        logger.info("classified intent: %s, stated: %s", label.intent, named)
+        return {"intent": label.intent, "stated_entities": stated}
 
     return route_intent
 
@@ -91,10 +104,6 @@ def route_after_intent(state: State) -> str:
         case "search":
             return "product_search"
         case "consultation":
-            if state.get("consultation_done"):
-                return "idle_reply"
-            if (state.get("entities") or Entities()).is_complete():
-                return "analysis"
-            return "ask_entity"
+            return "idle_reply" if state.get("consultation_done") else "capture_entity"
         case _:
             return "fallback"

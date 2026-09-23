@@ -1,9 +1,9 @@
 """Builds the scripted (flow-based) architecture's StateGraph.
 
-`START -> route_intent`, which routes every turn: `answer -> capture_entity -> (all 4 entities
-known? analysis -> suggestion : ask_entity)`; `search -> product_search`; `unclear -> fallback`;
-`consultation -> (consultation_done? idle_reply : all 4 known? analysis : ask_entity)`. Every other
-node ends the turn. See `docs/ARCHITECTURE_SCRIPTED.md` for the full per-node behavioral spec.
+`START -> route_intent`, which routes every turn: `search -> product_search`; `unclear ->
+fallback`; `consultation` once done `-> idle_reply`; otherwise `answer` and `consultation ->
+capture_entity -> (all 4 entities known? analysis -> suggestion : ask_entity)`. Every other node
+ends the turn. See `docs/ARCHITECTURE_SCRIPTED.md` for the full per-node behavioral spec.
 """
 
 import logging
@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 def _route_after_capture(state: State) -> str:
     if (state.get("entities") or Entities()).is_complete():
-        logger.info("all 4 entities captured: running analysis")
+        logger.info("all 4 entities known: running analysis")
         return "analysis"
     return "ask_entity"
 
@@ -68,7 +68,7 @@ def assemble_graph(
     graph.add_conditional_edges(
         "route_intent",
         route_after_intent,
-        ["capture_entity", "product_search", "fallback", "idle_reply", "ask_entity", "analysis"],
+        ["capture_entity", "product_search", "fallback", "idle_reply"],
     )
     graph.add_edge("analysis", "suggestion")
     for node in ["ask_entity", "product_search", "fallback", "idle_reply", "suggestion"]:

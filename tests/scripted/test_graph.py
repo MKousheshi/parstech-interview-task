@@ -55,8 +55,10 @@ def test_route_after_capture_runs_analysis_only_once_complete() -> None:
 class _Conversation:
     """Runs turns through a compiled scripted graph on fakes and returns each turn's replies."""
 
-    def __init__(self, *intents: Intent) -> None:
-        self.classifier = ScriptedRunnable(*(IntentLabel(intent=i) for i in intents))
+    def __init__(self, *labels: Intent | IntentLabel) -> None:
+        self.classifier = ScriptedRunnable(
+            *(IntentLabel(intent=label) if isinstance(label, str) else label for label in labels)
+        )
         self.llm = ScriptedRunnable(AIMessage(content="تحلیل"), AIMessage(content="پیشنهاد"))
         self.app = assemble_graph(
             self.classifier,
@@ -95,6 +97,34 @@ def test_full_consultation_asks_in_order_then_runs_analysis_and_suggestion() -> 
     assert chat.say("یک مشاوره دیگه می‌خوام") == [IDLE_MESSAGE]
 
 
+def test_a_consultation_request_stating_all_4_entities_is_answered_at_once() -> None:
+    label = IntentLabel(intent="consultation", **COMPLETE_ENTITIES.model_dump())
+    chat = _Conversation(label)
+
+    assert chat.say("یه کافه تو تهران دارم، B2C، از اینستاگرام می‌فروشم. مشاوره بده") == [
+        "تحلیل",
+        "پیشنهاد",
+    ]
+    assert chat.state()["entities"] == COMPLETE_ENTITIES
+    assert chat.state()["consultation_done"] is True
+
+
+def test_only_the_entities_not_yet_stated_are_asked_for() -> None:
+    opening = IntentLabel(intent="consultation", business_type="کافه", location="تهران")
+    chat = _Conversation(opening, "answer", "answer")
+
+    assert chat.say("یه کافه تو تهران دارم، مشاوره می‌خوام") == [QUESTIONS["customer_type"]]
+    assert chat.say("B2C") == [QUESTIONS["sales_channel"]]
+    assert chat.say("اینستاگرام") == ["تحلیل", "پیشنهاد"]
+
+
+def test_entities_mentioned_in_a_search_are_not_recorded() -> None:
+    chat = _Conversation(IntentLabel(intent="search", business_type="کافه"), "consultation")
+
+    chat.say("طراحی سایت برای کافه")
+    assert chat.say("مشاوره می‌خوام") == [QUESTIONS["business_type"]]
+
+
 def test_a_search_mid_consultation_keeps_the_question_pending() -> None:
     chat = _Conversation("consultation", "search", "answer")
 
@@ -104,7 +134,7 @@ def test_a_search_mid_consultation_keeps_the_question_pending() -> None:
     assert search_reply.startswith(RESULTS_HEADER.format(query="تلگرام"))
     assert search_reply.endswith(PENDING_REMINDER.format(question=QUESTIONS["business_type"]))
     assert chat.state()["awaiting_field"] == "business_type"
-    assert not chat.state().get("entities")
+    assert not chat.state()["entities"].known()
 
     assert chat.say("کافه") == [QUESTIONS["customer_type"]]
     assert chat.state()["entities"].business_type == "کافه"

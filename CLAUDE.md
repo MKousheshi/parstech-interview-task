@@ -48,7 +48,7 @@ A chatbot with a Gradio web UI (LangChain + LangGraph, OpenAI as LLM provider) w
 2. **Business consultation flow**: collects 4 entities (business type, customer type B2B/B2C, geographic location, virtual sales channel) across turns. Once all 4 are present, two separate LLM calls run: an analysis node (free-knowledge business recommendation, no product data in context) followed by a suggestion node (runs product search, then formats suggestions grounded in the retrieved results).
 
 Built as **two parallel chatbot architectures**, not one — see `docs/ARCHITECTURE_AGENTIC.md` and `docs/ARCHITECTURE_SCRIPTED.md`:
-   - **Scripted**: a state machine — entities collected one at a time in the spec's literal order, a fixed per-turn intent classifier, deterministic/template handling everywhere the task doesn't explicitly require an LLM call.
+   - **Scripted**: a state machine — missing entities asked one at a time in the spec's literal order (any stated up front are taken), a fixed per-turn intent classifier, deterministic/template handling everywhere the task doesn't explicitly require an LLM call.
    - **Agentic**: a tool-calling LLM agent — entities extracted/merged opportunistically in any order, one general assistant node handles search/follow-ups/tangents/off-topic input, hardcoded logic reserved only for the parts the task requires without exception.
    - Both share the same product pipeline and pluggable search strategies (`src/consultant_bot/common/`).
 

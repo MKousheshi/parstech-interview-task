@@ -4,7 +4,7 @@ The 4 fields, their Persian labels and the "are all 4 known" check live here onc
 that summarizes or checks entities agrees on them.
 """
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 # A value longer than this is cut short where it's quoted into a system prompt. Real answers
 # ("کافه", "تهران") are a few words; a long one is either a pasted paragraph or an attempt to
@@ -71,3 +71,19 @@ class Entities(BaseModel):
 
 
 ENTITY_FIELDS: tuple[str, ...] = tuple(ENTITY_LABELS)
+
+
+# What an LLM sometimes writes as text when it means "no value". Read literally, "null" would be
+# stored as the user's business type.
+PLACEHOLDER_VALUES = frozenset({"null", "none", "n/a", "unknown", "نامشخص", "ندارد"})
+
+
+class ReportedEntities(Entities):
+    """`Entities` as an LLM's structured output reports them: a placeholder string means unset."""
+
+    @field_validator(*ENTITY_FIELDS, mode="before")
+    @classmethod
+    def _placeholder_means_unset(cls, value: object) -> object:
+        if isinstance(value, str) and value.strip().lower() in PLACEHOLDER_VALUES:
+            return None
+        return value

@@ -19,11 +19,13 @@ class State(TypedDict):
     # first writes it, which is why nodes read them with `state.get(...)`.
     messages: Annotated[list[BaseMessage], add_messages]
     entities: NotRequired[Entities]
-    # The entity whose question was asked last; a message `route_intent` labels `answer` is stored
-    # into it verbatim.
+    # The entity whose question was asked last; an `answer` that states no entity is stored into it
+    # verbatim.
     awaiting_field: NotRequired[EntityField | None]
     # `route_intent`'s label for this turn, read by its conditional edge.
     intent: NotRequired[Intent | None]
+    # The entities `route_intent` found stated in this turn's message; `capture_entity` merges them.
+    stated_entities: NotRequired[Entities | None]
     consultation_done: NotRequired[bool]
     last_search_results: NotRequired[list[ProductHit] | None]
 
