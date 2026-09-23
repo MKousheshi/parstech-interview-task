@@ -20,7 +20,7 @@ EMBEDDING_MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
 def is_model_cached(model_name: str = EMBEDDING_MODEL_NAME) -> bool:
     """Checks whether `model_name` is already cached locally, without touching the network."""
     try:
-        SentenceTransformer(model_name, local_files_only=True)
+        SentenceTransformer(model_name, local_files_only=True, device="cpu")
     except Exception:
         return False
     return True
@@ -42,7 +42,10 @@ class EmbeddingSearch:
     _embeddings: Any = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        self._model = SentenceTransformer(self.model_name)
+        # Pinned to CPU: this is a small model over a tiny catalog, and letting
+        # sentence-transformers auto-pick CUDA breaks on GPUs the installed torch build doesn't
+        # have kernels for (e.g. older compute-capability cards).
+        self._model = SentenceTransformer(self.model_name, device="cpu")
         documents = [_document(product) for product in self.products]
         self._embeddings = self._model.encode(
             documents, normalize_embeddings=True, convert_to_numpy=True
