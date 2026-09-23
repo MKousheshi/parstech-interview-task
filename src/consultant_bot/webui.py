@@ -5,7 +5,9 @@ compiled graph shared by the process, one `thread_id` per browser session (assig
 so concurrent visitors get independent conversations without needing a real database.
 
 The `Chatbot`/`Textbox` components are configured `rtl=True` since the assistant's responses are in
-Persian.
+Persian. `WELCOME_MESSAGE` is seeded directly into the `Chatbot`'s initial value rather than run
+through the graph, so it displays instantly without an LLM call and doesn't count as a turn against
+the graph's own conversation state.
 """
 
 import argparse
@@ -17,6 +19,12 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.memory import MemorySaver
 
 from consultant_bot.cli import ARCHITECTURES
+
+WELCOME_MESSAGE = (
+    "سلام! من دستیار فروشگاه محصولات دیجیتال مارکتینگ هستم. می‌تونم توی پیدا کردن محصول "
+    "مناسب کمکت کنم، و اگر بخوای، برای کسب‌وکارت یک مشاوره کوتاه هم انجام بدم. چطور می‌تونم "
+    "کمکت کنم؟"
+)
 
 
 def build_demo(arch: str = "flexible") -> gr.Blocks:
@@ -34,7 +42,11 @@ def build_demo(arch: str = "flexible") -> gr.Blocks:
         gr.ChatInterface(
             fn=respond,
             additional_inputs=[thread_id],
-            chatbot=gr.Chatbot(rtl=True, label="دستیار مشاوره کسب‌وکار"),
+            chatbot=gr.Chatbot(
+                rtl=True,
+                label="دستیار مشاوره کسب‌وکار",
+                value=[{"role": "assistant", "content": WELCOME_MESSAGE}],
+            ),
             textbox=gr.Textbox(rtl=True, text_align="right", placeholder="پیام خود را بنویسید..."),
             title="دستیار مشاوره کسب‌وکار",
         )
