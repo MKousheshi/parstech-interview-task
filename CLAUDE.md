@@ -16,6 +16,7 @@ Package management is via `uv`.
 
 - Install deps: `uv sync`
 - Run the CLI entry point: `uv run consultant-bot`
+- Run the Gradio web UI (RTL-aware, for Persian): `uv run consultant-bot-web`
 - Run tests: `uv run pytest`
 - Run a single test: `uv run pytest tests/flexible/test_graph.py::test_route_after_assistant_ends_when_not_yet_requested`
 - Add a dependency: `uv add <package>` (dev-only: `uv add --dev <package>`)
@@ -32,7 +33,7 @@ Package management is via `uv`.
 - `docs/DECISIONS.md` — the living log of scope/architecture decisions, dated and with rationale + alternatives considered. **This is the source of truth for how the assistant should be built.** Read it before implementing anything — it already answers most "how should this work" questions.
 - `docs/ARCHITECTURE_FLEXIBLE.md` / `docs/ARCHITECTURE_RIGID.md` — implementation-level design for the two chatbot variants being built (see "What's being built" below): module layout, state schema, graph topology, and per-node behavior for each. Read the relevant one before touching `src/consultant_bot/flexible/` or `src/consultant_bot/rigid/`.
 - `products.json` — raw WooCommerce REST API export of the store's product catalog (29 items, Persian-language digital-marketing products/services). `description` and `short_description` are raw HTML and need cleanup before use. Not all WooCommerce fields are relevant (see the "Products data" section of `docs/CLARIFICATIONS.md` for which ones).
-- `src/consultant_bot/` — the Python package (uv-managed, src layout): `cli.py` (shared REPL), `common/` (shared product pipeline + search strategies + LLM factory), `flexible/` (fully built), `rigid/` (not yet started) per the architecture docs above.
+- `src/consultant_bot/` — the Python package (uv-managed, src layout): `cli.py` (shared REPL), `webui.py` (Gradio RTL web UI, same graph builders as the CLI), `common/` (shared product pipeline + search strategies + LLM factory), `flexible/` (fully built), `rigid/` (not yet started) per the architecture docs above.
 - `tests/` — pytest suite, mirroring the `src/` package layout.
 
 ## What's being built (per docs/DECISIONS.md)
