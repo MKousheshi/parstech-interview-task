@@ -1,28 +1,24 @@
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
-from consultant_bot.common.entities import Entities
+from consultant_bot.common.search.base import ProductHit
+from consultant_bot.common.search.products import Product
 from consultant_bot.flexible.nodes.analysis import build_analysis_node
+from tests.support import COMPLETE_ENTITIES, ScriptedRunnable
 
-COMPLETE_ENTITIES = Entities(
-    business_type="کافه", customer_type="B2C", location="تهران", sales_channel="اینستاگرام"
+SHOWN_PRODUCT = Product(
+    id=1,
+    name="مدیریت پیج اینستاگرام (اقتصادی)",
+    description="",
+    short_description="",
+    categories=[],
+    price="1",
+    permalink="https://example.com/1",
 )
 
 
-class RecordingFakeLLM:
-    """Records exactly what messages it was invoked with, to verify context isolation."""
-
-    def __init__(self, response: AIMessage) -> None:
-        self.response = response
-        self.received_messages: list | None = None  # type: ignore[type-arg]
-
-    def invoke(self, messages: list) -> AIMessage:  # type: ignore[type-arg]
-        self.received_messages = messages
-        return self.response
-
-
 def test_analysis_call_contains_only_a_system_and_entities_summary_message() -> None:
-    fake_llm = RecordingFakeLLM(AIMessage(content="تحلیل کسب‌وکار"))
-    node = build_analysis_node(fake_llm)  # type: ignore[arg-type]
+    fake_llm = ScriptedRunnable(AIMessage(content="تحلیل کسب‌وکار"))
+    node = build_analysis_node(fake_llm)
     prior_messages = [
         HumanMessage(content="یک محصول برای مدیریت پیج اینستاگرام میخوام"),
         AIMessage(content="حتماً، این چند گزینه مناسب است: مدیریت پیج اینستاگرام (اقتصادی)"),
@@ -32,34 +28,34 @@ def test_analysis_call_contains_only_a_system_and_entities_summary_message() -> 
         {
             "messages": prior_messages,
             "entities": COMPLETE_ENTITIES,
-            "last_shown_products": ["should never reach the analysis prompt"],
+            "last_shown_products": [ProductHit(product=SHOWN_PRODUCT, score=1.0)],
         }
     )
 
-    assert fake_llm.received_messages is not None
-    assert len(fake_llm.received_messages) == 2
-    assert isinstance(fake_llm.received_messages[0], SystemMessage)
-    assert isinstance(fake_llm.received_messages[1], HumanMessage)
-    for message in fake_llm.received_messages:
+    [received] = fake_llm.inputs
+    assert len(received) == 2
+    assert isinstance(received[0], SystemMessage)
+    assert isinstance(received[1], HumanMessage)
+    for message in received:
         assert "اینستاگرام (اقتصادی)" not in message.content
-    assert fake_llm.received_messages[1] not in prior_messages
+    assert received[1] not in prior_messages
 
 
 def test_analysis_summary_includes_all_four_entities() -> None:
-    fake_llm = RecordingFakeLLM(AIMessage(content="تحلیل"))
-    node = build_analysis_node(fake_llm)  # type: ignore[arg-type]
+    fake_llm = ScriptedRunnable(AIMessage(content="تحلیل"))
+    node = build_analysis_node(fake_llm)
 
     node({"messages": [], "entities": COMPLETE_ENTITIES, "last_shown_products": None})
 
-    summary = fake_llm.received_messages[1].content  # type: ignore[index]
+    summary = fake_llm.inputs[0][1].content
     for value in COMPLETE_ENTITIES.known().values():
         assert value in summary
 
 
 def test_analysis_appends_the_llm_response_and_stores_its_text() -> None:
     response = AIMessage(content="تحلیل نهایی")
-    fake_llm = RecordingFakeLLM(response)
-    node = build_analysis_node(fake_llm)  # type: ignore[arg-type]
+    fake_llm = ScriptedRunnable(response)
+    node = build_analysis_node(fake_llm)
 
     result = node({"messages": [], "entities": COMPLETE_ENTITIES, "last_shown_products": None})
 

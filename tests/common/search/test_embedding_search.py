@@ -3,14 +3,11 @@
 access to the model hub at all — see docs/TODO_FLEXIBLE.md's Phase 3 notes.
 """
 
-from pathlib import Path
-
 import pytest
 
 from consultant_bot.common.search.embedding_search import EmbeddingSearch, is_model_cached
 from consultant_bot.common.search.products import Product, load_products
-
-FIXTURE_PATH = Path(__file__).resolve().parents[2] / "fixtures" / "products_fixture.json"
+from tests.support import FIXTURE_PATH
 
 pytestmark = pytest.mark.skipif(
     not is_model_cached(),

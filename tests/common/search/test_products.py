@@ -1,8 +1,5 @@
-from pathlib import Path
-
 from consultant_bot.common.search.products import load_products, strip_html
-
-FIXTURE_PATH = Path(__file__).resolve().parents[2] / "fixtures" / "products_fixture.json"
+from tests.support import FIXTURE_PATH
 
 
 def test_load_products_returns_expected_count() -> None:

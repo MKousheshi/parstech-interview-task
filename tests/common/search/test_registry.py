@@ -1,6 +1,5 @@
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
 
@@ -8,8 +7,7 @@ from consultant_bot.common.search.filter_search import FilterSearch
 from consultant_bot.common.search.products import load_products
 from consultant_bot.common.search.registry import build_strategy
 from consultant_bot.common.search.tfidf_search import TfidfSearch
-
-FIXTURE_PATH = Path(__file__).resolve().parents[2] / "fixtures" / "products_fixture.json"
+from tests.support import FIXTURE_PATH
 
 
 @pytest.mark.parametrize(("name", "expected"), [("filter", FilterSearch), ("tfidf", TfidfSearch)])

@@ -24,7 +24,7 @@ else
     run uv run ruff format --check .
 fi
 
-run uv run mypy src
+run uv run mypy
 
 run uv run pip-audit
 

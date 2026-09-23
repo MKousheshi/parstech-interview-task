@@ -22,7 +22,7 @@ Package management is via `uv`.
 - **Run the full local check pipeline (lint, format check, types, dependency vulnerability scan, tests): `./scripts/check.sh`** — run this before considering any change done. `./scripts/check.sh --fix` auto-applies `ruff check --fix` and `ruff format` first.
 - Lint only: `uv run ruff check .` (add `--fix` to auto-fix)
 - Format only: `uv run ruff format .` (add `--check` to check without writing)
-- Type-check only: `uv run mypy src`
+- Type-check only: `uv run mypy` (checks `src` and `tests`, per `pyproject.toml`)
 - Dependency vulnerability scan only: `uv run pip-audit`
 
 ## Repository map

@@ -63,6 +63,7 @@ quote-style = "double"
 
 [tool.mypy]
 python_version = "3.12"
+files = ["src", "tests"]
 mypy_path = "src"
 explicit_package_bases = true
 check_untyped_defs = true
@@ -70,4 +71,8 @@ disallow_incomplete_defs = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 warn_return_any = true
+
+# scikit-learn ships neither inline types nor stubs; everything else is typed.
+[[tool.mypy.overrides]]
+module = ["sklearn.*"]
 ignore_missing_imports = true

@@ -1,11 +1,8 @@
-from pathlib import Path
-
 import pytest
 
 from consultant_bot.common.search.filter_search import FilterSearch
 from consultant_bot.common.search.products import Product, load_products
-
-FIXTURE_PATH = Path(__file__).resolve().parents[2] / "fixtures" / "products_fixture.json"
+from tests.support import FIXTURE_PATH
 
 
 @pytest.fixture

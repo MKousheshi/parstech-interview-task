@@ -1,4 +1,6 @@
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from typing import Any, cast
+
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 
 from consultant_bot.common.entities import Entities
 from consultant_bot.flexible.nodes.extract_entities import (
@@ -7,20 +9,12 @@ from consultant_bot.flexible.nodes.extract_entities import (
     build_extract_entities_node,
     recent_context,
 )
+from consultant_bot.flexible.state import State
+from tests.support import ScriptedRunnable
 
 
-class FakeExtractor:
-    """Stands in for the structured-output LLM, returning one canned response per call."""
-
-    def __init__(self, responses: list[ExtractedEntities]) -> None:
-        self._responses = list(responses)
-
-    def invoke(self, _messages: list) -> ExtractedEntities:  # type: ignore[type-arg]
-        return self._responses.pop(0)
-
-
-def _state(**overrides):  # type: ignore[no-untyped-def]
-    base = {
+def _state(**overrides: Any) -> State:
+    base: dict[str, Any] = {
         "messages": [HumanMessage(content="hi")],
         "entities": Entities(),
         "consultation_requested": False,
@@ -29,10 +23,10 @@ def _state(**overrides):  # type: ignore[no-untyped-def]
         "last_shown_products": None,
     }
     base.update(overrides)
-    return base
+    return cast(State, base)
 
 
-def _react_turn(index: int) -> list:  # type: ignore[type-arg]
+def _react_turn(index: int) -> list[BaseMessage]:
     """One turn's worth of history as the assistant's ReAct loop leaves it behind."""
     return [
         HumanMessage(content=f"سؤال {index}"),
@@ -62,7 +56,7 @@ def test_recent_context_never_starts_on_an_orphaned_tool_message() -> None:
 
 
 def test_fills_entities_from_first_mention() -> None:
-    node = build_extract_entities_node(FakeExtractor([ExtractedEntities(business_type="کافه")]))
+    node = build_extract_entities_node(ScriptedRunnable(ExtractedEntities(business_type="کافه")))
 
     update = node(_state())
 
@@ -71,11 +65,8 @@ def test_fills_entities_from_first_mention() -> None:
 
 
 def test_merges_across_calls_leaving_unmentioned_fields_untouched() -> None:
-    extractor = FakeExtractor(
-        [
-            ExtractedEntities(business_type="کافه"),
-            ExtractedEntities(location="تهران"),
-        ]
+    extractor = ScriptedRunnable(
+        ExtractedEntities(business_type="کافه"), ExtractedEntities(location="تهران")
     )
     node = build_extract_entities_node(extractor)
 
@@ -87,7 +78,7 @@ def test_merges_across_calls_leaving_unmentioned_fields_untouched() -> None:
 
 
 def test_overwrites_on_new_mention() -> None:
-    extractor = FakeExtractor([ExtractedEntities(customer_type="B2B")])
+    extractor = ScriptedRunnable(ExtractedEntities(customer_type="B2B"))
     node = build_extract_entities_node(extractor)
 
     update = node(_state(entities=Entities(customer_type="B2C")))
@@ -96,7 +87,7 @@ def test_overwrites_on_new_mention() -> None:
 
 
 def test_vague_answer_leaves_field_unset() -> None:
-    extractor = FakeExtractor([ExtractedEntities()])
+    extractor = ScriptedRunnable(ExtractedEntities())
     node = build_extract_entities_node(extractor)
 
     update = node(_state(entities=Entities(business_type="کافه")))
@@ -105,7 +96,7 @@ def test_vague_answer_leaves_field_unset() -> None:
 
 
 def test_consultation_requested_is_set_when_extractor_detects_it() -> None:
-    extractor = FakeExtractor([ExtractedEntities(wants_consultation=True)])
+    extractor = ScriptedRunnable(ExtractedEntities(wants_consultation=True))
     node = build_extract_entities_node(extractor)
 
     update = node(_state())
@@ -114,7 +105,7 @@ def test_consultation_requested_is_set_when_extractor_detects_it() -> None:
 
 
 def test_consultation_requested_stays_true_once_set() -> None:
-    extractor = FakeExtractor([ExtractedEntities(wants_consultation=False)])
+    extractor = ScriptedRunnable(ExtractedEntities(wants_consultation=False))
     node = build_extract_entities_node(extractor)
 
     update = node(_state(consultation_requested=True))
@@ -123,7 +114,7 @@ def test_consultation_requested_stays_true_once_set() -> None:
 
 
 def test_consultation_done_clears_when_entity_changes_after_completion() -> None:
-    extractor = FakeExtractor([ExtractedEntities(customer_type="B2B")])
+    extractor = ScriptedRunnable(ExtractedEntities(customer_type="B2B"))
     node = build_extract_entities_node(extractor)
 
     update = node(
@@ -138,7 +129,7 @@ def test_consultation_done_clears_when_entity_changes_after_completion() -> None
 
 
 def test_consultation_done_stays_true_when_nothing_changes() -> None:
-    extractor = FakeExtractor([ExtractedEntities()])
+    extractor = ScriptedRunnable(ExtractedEntities())
     node = build_extract_entities_node(extractor)
 
     update = node(

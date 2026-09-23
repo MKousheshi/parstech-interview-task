@@ -1,11 +1,8 @@
 """The checkpointer must round-trip the package's own state types without LangGraph's warning."""
 
 import logging
-from pathlib import Path
-from typing import Any
 
 import pytest
-from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
@@ -17,19 +14,13 @@ from consultant_bot.common.search.filter_search import FilterSearch
 from consultant_bot.common.search.products import load_products
 from consultant_bot.flexible.nodes.assistant import build_assistant_node
 from consultant_bot.flexible.state import State
-
-FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "products_fixture.json"
-
-
-class _ToolCallingFakeModel(GenericFakeChatModel):
-    def bind_tools(self, tools: Any, **kwargs: Any) -> "_ToolCallingFakeModel":
-        return self
+from tests.support import FIXTURE_PATH, ToolCallingFakeModel
 
 
 def test_state_types_round_trip_through_the_checkpointer_without_warnings(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    llm = _ToolCallingFakeModel(
+    llm = ToolCallingFakeModel(
         messages=iter(
             [
                 AIMessage(

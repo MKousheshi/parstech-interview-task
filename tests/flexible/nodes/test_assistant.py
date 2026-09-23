@@ -1,9 +1,6 @@
-from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, cast
 
-from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
-from langchain_core.outputs import ChatResult
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
 from consultant_bot.common.entities import Entities
 from consultant_bot.common.search.base import ProductHit
@@ -15,8 +12,8 @@ from consultant_bot.flexible.nodes.assistant import (
     is_complete_but_unrequested_and_unoffered,
     searched_hits,
 )
-
-FIXTURE_PATH = Path(__file__).resolve().parents[2] / "fixtures" / "products_fixture.json"
+from consultant_bot.flexible.state import State
+from tests.support import COMPLETE_ENTITIES, FIXTURE_PATH, ToolCallingFakeModel
 
 PRODUCT = Product(
     id=1,
@@ -28,20 +25,17 @@ PRODUCT = Product(
     permalink="https://example.com/instagram",
 )
 
-COMPLETE_ENTITIES = Entities(
-    business_type="کافه", customer_type="B2C", location="تهران", sales_channel="اینستاگرام"
-)
 
-
-def _state(**overrides):  # type: ignore[no-untyped-def]
-    base = {
+def _state(**overrides: Any) -> State:
+    base: dict[str, Any] = {
+        "messages": [],
         "entities": COMPLETE_ENTITIES,
         "consultation_requested": False,
         "consultation_offered": False,
         "consultation_done": False,
     }
     base.update(overrides)
-    return base
+    return cast(State, base)
 
 
 def test_true_when_complete_and_unrequested_and_unoffered() -> None:
@@ -80,34 +74,22 @@ def test_prompt_says_nothing_shown_yet_when_state_is_empty() -> None:
     assert "(هیچ)" in _build_system_prompt(_state(last_shown_products=None))
 
 
-class _ToolCallingFakeModel(GenericFakeChatModel):
-    """Replays scripted AI messages; `bind_tools` is a no-op since the tool calls are scripted.
-
-    Records the messages of every model call, to check what the agent actually sent.
-    """
-
-    received: ClassVar[list[list[BaseMessage]]] = []
-
-    def bind_tools(self, tools: Any, **kwargs: Any) -> "_ToolCallingFakeModel":
-        return self
-
-    def _generate(self, messages: list[BaseMessage], *args: Any, **kwargs: Any) -> ChatResult:
-        self.received.append(list(messages))
-        return super()._generate(messages, *args, **kwargs)
-
-
 def _search_call(call_id: str, query: str) -> dict[str, Any]:
     return {"name": "search_products", "args": {"query": query}, "id": call_id}
 
 
 def _run_assistant(scripted: list[AIMessage], **state_overrides: Any) -> dict[str, Any]:
-    llm = _ToolCallingFakeModel(messages=iter(scripted))
+    llm = ToolCallingFakeModel(messages=iter(scripted))
     node = build_assistant_node(llm, FilterSearch(load_products(FIXTURE_PATH)), top_k=5)
     state = _state(
-        entities=Entities(), messages=[HumanMessage(content="سلام")], last_shown_products=None
+        **{
+            "entities": Entities(),
+            "messages": [HumanMessage(content="سلام")],
+            "last_shown_products": None,
+            **state_overrides,
+        }
     )
-    state.update(state_overrides)
-    return node(state)  # type: ignore[no-any-return]
+    return node(state)
 
 
 def test_parallel_search_calls_in_one_step_merge_into_last_shown_products() -> None:
@@ -145,11 +127,11 @@ def test_searched_hits_is_none_without_a_search_and_empty_for_an_empty_search() 
 
 
 def test_every_model_call_gets_a_system_prompt_built_from_current_state() -> None:
-    _ToolCallingFakeModel.received = []
+    ToolCallingFakeModel.received = []
 
     _run_assistant([AIMessage(content="سلام!")], entities=Entities(business_type="کافه"))
 
-    [call] = _ToolCallingFakeModel.received
+    [call] = ToolCallingFakeModel.received
     assert isinstance(call[0], SystemMessage)
     assert "کافه" in call[0].content
     assert call[1].content == "سلام"

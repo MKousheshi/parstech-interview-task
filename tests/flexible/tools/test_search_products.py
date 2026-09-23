@@ -1,19 +1,19 @@
-from pathlib import Path
-
 from langchain_core.messages import ToolMessage
+from langchain_core.tools import BaseTool
 
 from consultant_bot.common.search.filter_search import FilterSearch
 from consultant_bot.common.search.products import load_products
 from consultant_bot.flexible.tools.search_products import build_search_products_tool
+from tests.support import FIXTURE_PATH
 
-FIXTURE_PATH = Path(__file__).resolve().parents[2] / "fixtures" / "products_fixture.json"
 
-
-def _invoke_tool(tool, query: str, category: str | None = None) -> ToolMessage:  # type: ignore[no-untyped-def]
+def _invoke_tool(tool: BaseTool, query: str, category: str | None = None) -> ToolMessage:
     args = {"query": query}
     if category is not None:
         args["category"] = category
-    return tool.invoke({"type": "tool_call", "name": tool.name, "args": args, "id": "call-1"})
+    message = tool.invoke({"type": "tool_call", "name": tool.name, "args": args, "id": "call-1"})
+    assert isinstance(message, ToolMessage)
+    return message
 
 
 def test_search_products_returns_formatted_content_and_hits_as_artifact() -> None:
