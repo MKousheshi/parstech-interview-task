@@ -2,7 +2,8 @@
 
 Everything is read by `pydantic-settings` from the real environment or a `.env` file at the project
 root (see `example.env` for the template) — anchored to the project, not the current directory, so
-the web UI finds its API key no matter where it's launched from. Values are validated up front: a
+the web UI finds its API key no matter where it's launched from (see `find_project_root` for an
+installed copy, which has no project root). Values are validated up front: a
 typo in `CONSULTANT_BOT_SEARCH_STRATEGY` or `CONSULTANT_BOT_LOG_LEVEL` fails at startup with a clear
 message instead of an error deep inside graph construction or logging setup.
 
@@ -17,7 +18,20 @@ from typing import Literal
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
+def find_project_root(module_file: Path) -> Path:
+    """The source checkout `module_file` belongs to, or the current directory if there is none.
+
+    From a checkout (`uv run`, an editable install) this is the repo root, found from this file's
+    own location so it doesn't depend on where the app is launched. A regular wheel install puts
+    this file under `site-packages`, three levels below which is no project at all, so it falls
+    back to the current directory for `.env` and `products.json` there.
+    """
+    checkout = module_file.resolve().parents[3]
+    return checkout if (checkout / "pyproject.toml").is_file() else Path.cwd()
+
+
+PROJECT_ROOT = find_project_root(Path(__file__))
 
 SearchStrategyName = Literal["filter", "tfidf", "embedding"]
 

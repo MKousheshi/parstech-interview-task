@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from consultant_bot.common.config import PROJECT_ROOT, Settings
+from consultant_bot.common.config import PROJECT_ROOT, Settings, find_project_root
 
 
 def test_env_file_is_anchored_to_the_project_root_not_the_cwd(
@@ -53,3 +53,19 @@ def test_unknown_log_level_is_rejected_up_front(monkeypatch: pytest.MonkeyPatch)
 
     with pytest.raises(ValidationError):
         Settings()
+
+
+def test_project_root_is_the_checkout_holding_the_package() -> None:
+    assert (PROJECT_ROOT / "pyproject.toml").is_file()
+    assert (PROJECT_ROOT / "src" / "consultant_bot").is_dir()
+
+
+def test_an_installed_copy_falls_back_to_the_current_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_file = tmp_path / "lib" / "site-packages" / "consultant_bot" / "common" / "config.py"
+    cwd = tmp_path / "somewhere"
+    cwd.mkdir()
+    monkeypatch.chdir(cwd)
+
+    assert find_project_root(module_file) == cwd
