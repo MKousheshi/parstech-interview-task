@@ -39,8 +39,9 @@ src/consultant_bot/
       embedding_search.py         # Phase 3: sentence-transformers semantic search
   rigid/
     __init__.py
-    graph.py                 # builds and wires this variant's StateGraph
-    state.py                  # this variant's State schema
+    graph.py                 # build_graph() + assemble_graph() (the same wiring over injected
+                              # LLM pieces/strategy, so tests can run the compiled graph on fakes)
+    state.py                  # this variant's State schema, EntityField/Intent literals, Node protocol
     nodes/
       route_intent.py           # 3-way classifier: search | consultation | unclear
       capture_entity.py           # stores the raw reply verbatim into the pending field
@@ -142,8 +143,9 @@ Same `common/config.py` as the flexible variant.
 ## Testing approach
 
 - **Search strategies** — same deterministic unit tests, shared fixtures with the flexible variant.
-- **`capture_entity` / `ask_entity` / route selection** — trivial plain-function tests against constructed `State` values; no LLM needed for anything except `route_intent`, `analysis`, and `suggestion`'s formatting call.
-- **End-to-end** — exercised manually via the web UI demo.
+- **`capture_entity` / `ask_entity` / route selection** — trivial plain-function tests against constructed `State` values; no LLM needed for anything except `route_intent`, `analysis`, and `suggestion`'s formatting call, which are tested with scripted fakes.
+- **Multi-turn flow** — `tests/rigid/test_graph.py` runs whole conversations through the compiled graph (`assemble_graph` with a scripted classifier/LLM, the fixture-backed `FilterSearch` and the real checkpointer): the 4 questions in order, analysis + suggestion on the 4th answer, the idle reply afterwards, an off-topic reply swallowed by a pending field.
+- **End-to-end** — a live-LLM pass (gpt-4o-mini, `filter` strategy) over the scenarios in "Known limitations" below plus the happy path, run by a script invoking the compiled graph the same way the web UI does. Every limitation showed up exactly as described. One thing worth knowing: because `product_search` passes the whole sentence as the query, the `filter` strategy's incidental single-word matches (e.g. "خدمات") dominate the ranking. A "site design" request listed Instagram page management first, ahead of the actual site-design products.
 
 This variant is meaningfully easier to test without a live LLM than the flexible one, since most of the graph is plain deterministic code — a direct consequence of the design, not incidental.
 

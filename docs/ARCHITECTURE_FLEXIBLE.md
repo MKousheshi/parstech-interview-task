@@ -158,7 +158,7 @@ OpenAI connection details (`OPENAI_API_KEY`, optional `OPENAI_BASE_URL`, optiona
 - **`analysis`'s context isolation** — a fake LLM that records exactly what messages it was invoked with, asserting the call is always exactly a system message plus a 2-line entities summary, never `state["messages"]` or `last_shown_products`. Turns "isolation is structural" from a design claim into something a test actually checks.
 - **`suggestion`'s threshold/retrieval logic** — a fake `SearchStrategy` and fake formatting LLM, asserting the formatter is never even called when nothing clears the relevance floor (the honest-fallback path), and that `consultation_done`/`last_shown_products` are set in both the found and nothing-found branches.
 - **`assistant` node behavior** (tool-calling, decomposition, follow-ups, off-topic handling, not pre-empting analysis) and the query-formulation/formatting LLM calls inside `suggestion` aren't meaningfully unit-testable without a live/mocked LLM — exercised manually via the web UI demo.
-- **End-to-end** — exercised manually via the web UI demo. (As of this writing, that manual pass is still pending in this environment for lack of an `OPENAI_API_KEY`.)
+- **End-to-end** — exercised manually via the web UI demo. A live-LLM pass (gpt-4o-mini, `filter` strategy) has covered entity collection across turns, a follow-up question about a prior result, compound search, an off-topic tangent mid-consultation, and a delayed consultation request. Correcting an entity after the suggestion fired, and a silent completion followed by the proactive offer, haven't been run live yet.
 
 ## Comparison notes
 
