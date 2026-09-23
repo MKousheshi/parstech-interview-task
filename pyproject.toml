@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-consultant-bot = "consultant_bot:main"
+consultant-bot = "consultant_bot.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.12.3,<0.13.0"]
