@@ -16,8 +16,11 @@ from langgraph.graph.message import add_messages
 from consultant_bot.webui import (
     ERROR_MESSAGE,
     NO_REPLY_MESSAGE,
+    add_replies,
+    add_user_message,
     turn_replies,
     user_facing_replies,
+    welcome_history,
 )
 
 
@@ -95,3 +98,32 @@ def test_a_turn_with_no_visible_reply_says_so() -> None:
         return {"messages": []}
 
     assert user_facing_replies(_build_app_with(silent), "t", "سلام") == [NO_REPLY_MESSAGE]
+
+
+def test_submitting_shows_the_user_message_and_empties_the_textbox() -> None:
+    history, textbox = add_user_message("سلام", welcome_history())
+
+    assert history == [*welcome_history(), {"role": "user", "content": "سلام"}]
+    assert textbox == ""
+
+
+def test_blank_input_is_ignored() -> None:
+    assert add_user_message("   ", welcome_history()) == (welcome_history(), "")
+
+
+def test_replies_are_appended_as_one_bubble_each() -> None:
+    history, _ = add_user_message("سلام", welcome_history())
+
+    updated = add_replies(_build_app(), history, "thread-1")
+
+    assert updated[len(history) :] == [
+        {"role": "assistant", "content": text}
+        for text in ["پاسخ دستیار", "تحلیل کسب‌وکار", "پیشنهاد محصول"]
+    ]
+
+
+def test_no_turn_runs_without_a_new_user_message() -> None:
+    app = _build_app()
+
+    assert add_replies(app, welcome_history(), "thread-1") == welcome_history()
+    assert app.get_state({"configurable": {"thread_id": "thread-1"}}).values == {}

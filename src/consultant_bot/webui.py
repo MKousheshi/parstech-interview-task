@@ -8,6 +8,12 @@ The `Chatbot`/`Textbox` components are configured `rtl=True` since the assistant
 Persian. `WELCOME_MESSAGE` is seeded directly into the `Chatbot`'s initial value rather than run
 through the graph, so it displays instantly without an LLM call and doesn't count as a turn against
 the graph's own conversation state.
+
+The page is a plain `Chatbot` + `Textbox` rather than `gr.ChatInterface`. `ChatInterface` adds undo
+and retry buttons that only edit what the browser shows: the graph's checkpointed conversation
+would keep the undone message, and a retry would send the same message into it a second time. The
+one history control kept is the chatbot's clear button, and clearing starts a new `thread_id`, so
+the bot forgets exactly what the user just watched disappear.
 """
 
 import argparse
@@ -68,26 +74,48 @@ def user_facing_replies(app: CompiledStateGraph, thread_id: str, message: str) -
     return replies or [NO_REPLY_MESSAGE]
 
 
+ChatHistory = list[dict[str, str]]
+
+
+def new_thread_id() -> str:
+    return str(uuid.uuid4())
+
+
+def welcome_history() -> ChatHistory:
+    return [{"role": "assistant", "content": WELCOME_MESSAGE}]
+
+
+def add_user_message(message: str, history: ChatHistory) -> tuple[ChatHistory, str]:
+    """Shows the user's message right away and empties the textbox; blank input is ignored."""
+    if not message.strip():
+        return history, ""
+    return [*history, {"role": "user", "content": message}], ""
+
+
+def add_replies(app: CompiledStateGraph, history: ChatHistory, thread_id: str) -> ChatHistory:
+    """Runs the turn for the user message `add_user_message` just showed and appends its replies."""
+    if not history or history[-1]["role"] != "user":
+        return history
+    replies = user_facing_replies(app, thread_id, history[-1]["content"])
+    return [*history, *({"role": "assistant", "content": reply} for reply in replies)]
+
+
 def build_demo(arch: str = "flexible") -> gr.Blocks:
     app = ARCHITECTURES[arch](build_checkpointer())
 
-    def respond(message: str, history: list[dict[str, str]], thread_id: str) -> list[str]:
-        return user_facing_replies(app, thread_id, message)
-
     with gr.Blocks(title="دستیار مشاوره کسب‌وکار") as demo:
-        thread_id = gr.State()
-        demo.load(lambda: str(uuid.uuid4()), outputs=thread_id)
-        gr.ChatInterface(
-            fn=respond,
-            additional_inputs=[thread_id],
-            chatbot=gr.Chatbot(
-                rtl=True,
-                label="دستیار مشاوره کسب‌وکار",
-                value=[{"role": "assistant", "content": WELCOME_MESSAGE}],
-            ),
-            textbox=gr.Textbox(rtl=True, text_align="right", placeholder="پیام خود را بنویسید..."),
-            title="دستیار مشاوره کسب‌وکار",
+        gr.Markdown("# دستیار مشاوره کسب‌وکار", rtl=True)
+        # A callable value is called on every page load, so each browser session gets its own.
+        thread_id = gr.State(new_thread_id)
+        chatbot = gr.Chatbot(rtl=True, label="دستیار مشاوره کسب‌وکار", value=welcome_history)
+        textbox = gr.Textbox(
+            rtl=True, text_align="right", placeholder="پیام خود را بنویسید...", show_label=False
         )
+
+        textbox.submit(add_user_message, [textbox, chatbot], [chatbot, textbox], queue=False).then(
+            lambda history, tid: add_replies(app, history, tid), [chatbot, thread_id], chatbot
+        )
+        chatbot.clear(lambda: (welcome_history(), new_thread_id()), outputs=[chatbot, thread_id])
 
     return demo  # type: ignore[no-any-return]
 
