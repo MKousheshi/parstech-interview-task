@@ -33,7 +33,7 @@ def find_project_root(module_file: Path) -> Path:
 
 PROJECT_ROOT = find_project_root(Path(__file__))
 
-SearchStrategyName = Literal["filter", "tfidf", "embedding"]
+SearchStrategyName = Literal["filter", "tfidf", "embedding", "hybrid"]
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
@@ -54,7 +54,8 @@ class Settings(BaseSettings):
     )
     llm_max_retries: int = Field(default=2, ge=0, validation_alias="CONSULTANT_BOT_LLM_MAX_RETRIES")
 
-    # "filter" (Phase 1), "tfidf" (Phase 2) or "embedding" (Phase 3).
+    # "filter" (Phase 1), "tfidf" (Phase 2), "embedding" (Phase 3) or "hybrid" (TF-IDF and
+    # embedding scores blended).
     search_strategy: SearchStrategyName = Field(
         default="filter", validation_alias="CONSULTANT_BOT_SEARCH_STRATEGY"
     )

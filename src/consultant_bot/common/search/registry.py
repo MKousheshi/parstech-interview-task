@@ -1,12 +1,14 @@
 """Builds a search strategy by name, shared by both architectures.
 
-`EmbeddingSearch` is imported only when asked for: importing it pulls in `sentence-transformers`
-and `torch`, which would otherwise slow every startup even with the default filter strategy.
+`EmbeddingSearch` is imported only when asked for (directly or inside the hybrid strategy):
+importing it pulls in `sentence-transformers` and `torch`, which would otherwise slow every
+startup even with the default filter strategy.
 """
 
 from consultant_bot.common.config import SearchStrategyName, get_settings
 from consultant_bot.common.search.base import SearchStrategy
 from consultant_bot.common.search.filter_search import FilterSearch
+from consultant_bot.common.search.hybrid_search import HybridSearch
 from consultant_bot.common.search.products import Product, load_products
 from consultant_bot.common.search.tfidf_search import TfidfSearch
 
@@ -18,6 +20,8 @@ def build_strategy(name: SearchStrategyName, products: list[Product]) -> SearchS
         return TfidfSearch(products)
     from consultant_bot.common.search.embedding_search import EmbeddingSearch
 
+    if name == "hybrid":
+        return HybridSearch(lexical=TfidfSearch(products), semantic=EmbeddingSearch(products))
     return EmbeddingSearch(products)
 
 

@@ -42,8 +42,9 @@ A chatbot with a Gradio web UI (LangChain + LangGraph, OpenAI as LLM provider) w
 1. **Product search** over `products.json`, built in three phases as separate, comparable strategies (not a single final implementation):
    - Phase 1: filter/keyword search (substring match on name/description/category + explicit category filter).
    - Phase 2: TF-IDF similarity search (`scikit-learn` `TfidfVectorizer` + cosine similarity, category folded into the text corpus).
-   - Phase 3: embedding/semantic search (local multilingual `sentence-transformers` model — not yet pinned).
-   - A small comparison script (`uv run python scripts/compare_search.py`) runs all three strategies side-by-side on realistic Persian queries.
+   - Phase 3: embedding/semantic search (local multilingual `sentence-transformers` model, `paraphrase-multilingual-MiniLM-L12-v2`).
+   - Hybrid: a weighted sum of the TF-IDF and embedding scores (`CONSULTANT_BOT_SEARCH_STRATEGY=hybrid`), with its relevance floor the same blend of theirs.
+   - A small comparison script (`uv run python scripts/compare_search.py`) runs all the strategies side-by-side on realistic Persian queries.
 2. **Business consultation flow**: collects 4 entities (business type, customer type B2B/B2C, geographic location, virtual sales channel) across turns. Once all 4 are present, two separate LLM calls run: an analysis node (free-knowledge business recommendation, no product data in context) followed by a suggestion node (runs product search, then formats suggestions grounded in the retrieved results).
 
 Built as **two parallel chatbot architectures**, not one — see `docs/ARCHITECTURE_FLEXIBLE.md` and `docs/ARCHITECTURE_RIGID.md`:

@@ -37,6 +37,7 @@ src/consultant_bot/
       filter_search.py          # Phase 1: keyword/substring + category filter
       tfidf_search.py            # Phase 2: TF-IDF + cosine similarity
       embedding_search.py         # Phase 3: sentence-transformers semantic search
+      hybrid_search.py             # TF-IDF and embedding scores blended (weighted sum)
   rigid/
     __init__.py
     graph.py                 # build_graph() + assemble_graph() (the same wiring over injected
@@ -132,7 +133,7 @@ class ProductHit:
     score: float
 ```
 
-Same three phases as the flexible variant (filter/keyword, TF-IDF, embeddings), same protocol, same `config.py` selection, same `scripts/compare_search.py` comparison script — this part of the system doesn't differ between architectures.
+Same three phases as the flexible variant (filter/keyword, TF-IDF, embeddings), plus the same `hybrid` blend of the last two, same protocol, same `config.py` selection, same `scripts/compare_search.py` comparison script — this part of the system doesn't differ between architectures.
 
 ## Web UI / session model
 

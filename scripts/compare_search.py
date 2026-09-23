@@ -1,4 +1,4 @@
-"""Side-by-side comparison of the three search strategies against realistic Persian queries.
+"""Side-by-side comparison of the search strategies against realistic Persian queries.
 
 Run manually to sanity-check relevance across phases:
 `uv run python scripts/compare_search.py`
@@ -7,6 +7,7 @@ Run manually to sanity-check relevance across phases:
 from consultant_bot.common.config import SearchStrategyName
 from consultant_bot.common.search.base import ProductHit, SearchStrategy
 from consultant_bot.common.search.embedding_search import is_model_cached
+from consultant_bot.common.search.hybrid_search import HybridSearch
 from consultant_bot.common.search.products import load_products
 from consultant_bot.common.search.registry import build_strategy
 
@@ -42,6 +43,11 @@ def main() -> None:
             "access to download and cache it)\n"
         )
     strategies: dict[str, SearchStrategy] = {name: build_strategy(name, products) for name in names}
+    if "embedding" in strategies:
+        # Built from the instances above rather than by name, so the model loads only once.
+        strategies["hybrid"] = HybridSearch(
+            lexical=strategies["tfidf"], semantic=strategies["embedding"]
+        )
 
     for query in QUERIES:
         print(f"=== query: {query!r} ===")
