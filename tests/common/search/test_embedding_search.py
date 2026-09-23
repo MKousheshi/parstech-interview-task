@@ -1,6 +1,6 @@
 """Phase 3 tests. Skipped unless the embedding model is already cached locally: downloading a
 ~118MB model on every test run isn't practical for CI, and this environment may not have network
-access to the model hub at all — see docs/TODO_FLEXIBLE.md's Phase 3 notes.
+access to the model hub at all.
 """
 
 import pytest

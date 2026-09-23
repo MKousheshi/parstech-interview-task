@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-Interview take-home task. The **flexible** architecture (see `docs/ARCHITECTURE_FLEXIBLE.md`) is fully implemented: shared product pipeline, all three search-strategy phases, and the full `extract_entities -> assistant -> completion_check -> (analysis -> suggestion | END)` graph, wired up behind `uv run consultant-bot-web --arch flexible`. The **rigid** architecture (`docs/ARCHITECTURE_RIGID.md`) has not been started yet — only the flexible variant's checklist (`docs/TODO_FLEXIBLE.md`) has been worked through. Live-LLM manual QA (the demo scenarios called for in the architecture doc) is still pending in whatever environment picks this up next, since no `OPENAI_API_KEY` was available while building the flexible variant.
+Interview take-home task. The **flexible** architecture (see `docs/ARCHITECTURE_FLEXIBLE.md`) is fully implemented: shared product pipeline, all three search-strategy phases, and the full `extract_entities -> assistant -> completion_check -> (analysis -> suggestion | END)` graph, wired up behind `uv run consultant-bot-web --arch flexible`. The **rigid** architecture (`docs/ARCHITECTURE_RIGID.md`) has not been started yet; its implementation checklist is `docs/TODO_RIGID.md` (local, gitignored). Live-LLM manual QA (the demo scenarios called for in the architecture doc) is still pending in whatever environment picks this up next, since no `OPENAI_API_KEY` was available while building the flexible variant.
 
 ## Configuration
 
