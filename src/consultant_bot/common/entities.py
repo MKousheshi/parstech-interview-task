@@ -6,6 +6,24 @@ that summarizes or checks entities agrees on them.
 
 from pydantic import BaseModel, ConfigDict
 
+# A value longer than this is cut short where it's quoted into a system prompt. Real answers
+# ("کافه", "تهران") are a few words; a long one is either a pasted paragraph or an attempt to
+# smuggle instructions into the system role.
+MAX_QUOTED_VALUE_CHARS = 80
+
+
+def quote_user_value(value: str) -> str:
+    """`value` wrapped in «», shortened and with guillemets removed, for use inside a system prompt.
+
+    Entity values are the user's own words. Quoting them marks them as data, and removing any «»
+    they contain stops a value from closing the quote early and continuing as prompt text.
+    """
+    text = " ".join(value.replace("«", "").replace("»", "").split())
+    if len(text) > MAX_QUOTED_VALUE_CHARS:
+        text = text[:MAX_QUOTED_VALUE_CHARS].rstrip() + "…"
+    return f"«{text}»"
+
+
 ENTITY_LABELS: dict[str, str] = {
     "business_type": "نوع کسب‌وکار",
     "customer_type": "نوع مشتریان (B2B یا B2C)",
@@ -40,6 +58,12 @@ class Entities(BaseModel):
 
     def missing_labels(self) -> list[str]:
         return [ENTITY_LABELS[field] for field in ENTITY_FIELDS if not self.value(field)]
+
+    def quoted_summary(self) -> str:
+        """`summary()` with each value run through `quote_user_value`, for system prompts."""
+        return "\n".join(
+            f"- {label}: {quote_user_value(value)}" for label, value in self.known().items()
+        )
 
     def summary(self) -> str:
         """One "- label: value" line per field, for LLM prompts built from the entities alone."""

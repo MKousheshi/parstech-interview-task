@@ -139,5 +139,5 @@ def test_every_model_call_gets_a_system_prompt_built_from_current_state() -> Non
 
     [call] = ToolCallingFakeModel.received
     assert isinstance(call[0], SystemMessage)
-    assert "کافه" in call[0].content
+    assert "«کافه»" in call[0].content
     assert call[1].content == "سلام"
