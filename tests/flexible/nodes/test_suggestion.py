@@ -175,3 +175,21 @@ def test_threshold_defaults_to_the_strategys_own_relevance_threshold() -> None:
 
     assert formatter.was_called is False
     assert _recorded_hits(result) == []
+
+
+def test_formatter_sees_the_business_and_the_analysis_alongside_the_hits() -> None:
+    formatter = ScriptedRunnable(AIMessage(content="پیشنهاد نهایی"))
+    node = build_suggestion_node(
+        ScriptedRunnable(SearchQuery(query="کافه")),
+        FakeSearchStrategy([ProductHit(product=_product(1), score=0.5)]),
+        formatter,
+        top_k=5,
+        relevance_threshold=0.1,
+    )
+
+    node(_state())
+
+    prompt = formatter.inputs[0][1].content
+    assert COMPLETE_ENTITIES.summary() in prompt
+    assert "تحلیل کسب‌وکار شما این است..." in prompt
+    assert "https://example.com/1" in prompt

@@ -3,9 +3,11 @@
 Two internal steps, both deterministic in sequence: (1) a small LLM call turns the 4 entities plus
 the analysis text (`state["analysis"]`, written by the `analysis` node) into a short, focused
 search query and an optional category guess; (2) `search_products` is called directly against the
-active `SearchStrategy` — not through the assistant's tool loop — a strategy-appropriate relevance
-threshold is applied, and only hits that clear it are ever shown to the formatting LLM, which is
-explicitly told not to invent products and to say so honestly if none did.
+active `SearchStrategy` — not through the assistant's tool loop — and a strategy-appropriate
+relevance threshold is applied. Only hits that clear it are shown to the formatting LLM, together
+with the entities and the analysis so the write-up addresses this business, and it's told not to
+invent products. If no hit clears the threshold, the formatting call is skipped for a fixed
+"nothing found" reply.
 
 The retrieval is also recorded in `messages` as a `search_products` call/result pair, placed just
 before the formatted reply and holding exactly the hits that cleared the threshold. The formatting
@@ -50,9 +52,9 @@ QUERY_FORMULATION_SYSTEM_PROMPT = """\
 """
 
 FORMATTING_SYSTEM_PROMPT = """\
-بر اساس فهرست محصولات زیر که از کاتالوگ واقعی فروشگاه بازیابی شده‌اند، یک پیشنهاد محصول/بسته \
-مناسب برای کاربر بنویس. فقط از محصولات فهرست‌شده استفاده کن و هرگز محصول یا قیمتی که در فهرست \
-نیست را اختراع نکن.\
+بر اساس اطلاعات کسب‌وکار کاربر، تحلیل ارائه‌شده و فهرست محصولاتی که از کاتالوگ واقعی فروشگاه \
+بازیابی شده‌اند، یک پیشنهاد محصول/بسته مناسب برای این کسب‌وکار بنویس. فقط از محصولات فهرست‌شده \
+استفاده کن و هرگز محصول یا قیمتی که در فهرست نیست را اختراع نکن.\
 """
 
 
@@ -129,7 +131,11 @@ def build_suggestion_node(
                 formatting_llm.invoke(
                     [
                         SystemMessage(content=FORMATTING_SYSTEM_PROMPT),
-                        HumanMessage(content=format_hits(hits)),
+                        HumanMessage(
+                            content=f"اطلاعات کسب‌وکار:\n{entities.summary()}\n\n"
+                            f"تحلیل کسب‌وکار:\n{analysis_text}\n\n"
+                            f"محصولات:\n{format_hits(hits)}"
+                        ),
                     ]
                 )
             )
