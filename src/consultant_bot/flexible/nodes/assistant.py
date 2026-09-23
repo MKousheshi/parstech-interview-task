@@ -8,11 +8,11 @@ analysis/suggestion pair, and proactively offering a consultation once entities 
 unrequested and unoffered.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any
 
 from langchain_core.language_models import LanguageModelLike
-from langchain_core.messages import BaseMessage, SystemMessage
+from langchain_core.messages import BaseMessage, SystemMessage, ToolMessage
 
 # Deprecated in favor of langchain.agents.create_agent, but that replacement only takes a static
 # system_prompt (str/SystemMessage) rather than a per-invocation callable — this node needs the
@@ -22,9 +22,12 @@ from langgraph.prebuilt import create_react_agent
 
 from consultant_bot.common import config
 from consultant_bot.common.entities import Entities
-from consultant_bot.common.search.base import SearchStrategy, format_hits
+from consultant_bot.common.search.base import ProductHit, SearchStrategy, format_hits
 from consultant_bot.flexible.state import State
-from consultant_bot.flexible.tools.search_products import build_search_products_tool
+from consultant_bot.flexible.tools.search_products import (
+    SEARCH_PRODUCTS_TOOL_NAME,
+    build_search_products_tool,
+)
 
 ENTITY_LABELS: dict[str, str] = {
     "business_type": "نوع کسب‌وکار",
@@ -110,6 +113,30 @@ def _build_system_prompt(state: State) -> str:
     )
 
 
+def searched_hits(messages: Sequence[BaseMessage]) -> list[ProductHit] | None:
+    """Every product the `search_products` calls among `messages` returned, deduplicated in order.
+
+    `None` when no search ran, so the caller can leave the previous turn's `last_shown_products`
+    in place for follow-up questions; a search that found nothing yields `[]`, which does replace
+    it.
+    """
+    searches = [
+        message
+        for message in messages
+        if isinstance(message, ToolMessage) and message.name == SEARCH_PRODUCTS_TOOL_NAME
+    ]
+    if not searches:
+        return None
+    hits: list[ProductHit] = []
+    seen_ids: set[int] = set()
+    for search in searches:
+        for hit in search.artifact or []:
+            if hit.product.id not in seen_ids:
+                seen_ids.add(hit.product.id)
+                hits.append(hit)
+    return hits
+
+
 def _prompt(state: State) -> list[BaseMessage]:
     return [SystemMessage(content=_build_system_prompt(state)), *state["messages"]]
 
@@ -128,6 +155,9 @@ def build_assistant_node(
     def assistant(state: State) -> dict[str, Any]:
         should_offer = is_complete_but_unrequested_and_unoffered(state)
         result: dict[str, Any] = react_agent.invoke(state)
+        hits = searched_hits(result["messages"][len(state["messages"]) :])
+        if hits is not None:
+            result["last_shown_products"] = hits
         if should_offer:
             result["consultation_offered"] = True
         return result

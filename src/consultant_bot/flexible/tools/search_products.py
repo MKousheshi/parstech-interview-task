@@ -1,19 +1,18 @@
 """LangChain tool wrapping the active SearchStrategy.
 
-On every call, it also updates `state.last_shown_products` so follow-up turns ("what's the price
-of it?") can be answered directly from state instead of re-running search on an under-specified
-query.
+Each call returns the formatted hits as the `ToolMessage` content (what the LLM reads) and the raw
+`ProductHit` list as its artifact. The tool deliberately does *not* write `last_shown_products`
+itself: the assistant is told to issue one call per need, and OpenAI runs those as parallel tool
+calls in a single step, where several writes to the same state key are rejected outright. The
+`assistant` node instead folds every artifact from the turn into one `last_shown_products` update.
 """
 
 from collections.abc import Callable
-from typing import Annotated
 
-from langchain_core.messages import ToolMessage
-from langchain_core.tools import BaseTool, InjectedToolCallId, tool
-from langgraph.types import Command
+from langchain_core.tools import BaseTool, tool
 
 from consultant_bot.common import config
-from consultant_bot.common.search.base import SearchStrategy, format_hits
+from consultant_bot.common.search.base import ProductHit, SearchStrategy, format_hits
 from consultant_bot.common.search.embedding_search import EmbeddingSearch
 from consultant_bot.common.search.filter_search import FilterSearch
 from consultant_bot.common.search.products import Product, load_products
@@ -33,6 +32,8 @@ def build_active_strategy() -> SearchStrategy:
     return builder(products)
 
 
+SEARCH_PRODUCTS_TOOL_NAME = "search_products"
+
 NO_HITS_MESSAGE = "هیچ محصول مرتبطی یافت نشد."
 
 
@@ -41,12 +42,8 @@ def build_search_products_tool(
 ) -> BaseTool:
     """Builds a `search_products` tool bound to a specific `SearchStrategy` instance."""
 
-    @tool
-    def search_products(
-        query: str,
-        tool_call_id: Annotated[str, InjectedToolCallId],
-        category: str | None = None,
-    ) -> Command:
+    @tool(SEARCH_PRODUCTS_TOOL_NAME, response_format="content_and_artifact")
+    def search_products(query: str, category: str | None = None) -> tuple[str, list[ProductHit]]:
         """Search the store's product catalog for products matching a query.
 
         Use one focused query per distinct need. For a compound request covering several
@@ -57,15 +54,6 @@ def build_search_products_tool(
             category: An optional exact category name to narrow the search.
         """
         hits = strategy.search(query, category=category, top_k=top_k)
-        return Command(
-            update={
-                "last_shown_products": hits,
-                "messages": [
-                    ToolMessage(
-                        content=format_hits(hits) or NO_HITS_MESSAGE, tool_call_id=tool_call_id
-                    )
-                ],
-            }
-        )
+        return format_hits(hits) or NO_HITS_MESSAGE, hits
 
     return search_products
