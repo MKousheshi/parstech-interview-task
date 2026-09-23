@@ -2,6 +2,10 @@
 
 Query tokens are normalized and stripped of Persian stopwords first (see `text.py`); without that,
 words like "و" or "در" substring-match almost every product and every query scores as relevant.
+
+A blank query and a query of stopwords only are deliberately treated differently. A blank query
+means "list what's here" (every strategy supports it, so a caller can browse a category), while a
+query made only of filler words names nothing to look for, so it matches nothing.
 """
 
 from dataclasses import dataclass, field
