@@ -12,7 +12,12 @@ from collections.abc import Callable
 from langchain_core.tools import BaseTool, tool
 
 from consultant_bot.common import config
-from consultant_bot.common.search.base import ProductHit, SearchStrategy, format_hits
+from consultant_bot.common.search.base import (
+    ProductHit,
+    SearchStrategy,
+    format_hits,
+    search_with_category_fallback,
+)
 from consultant_bot.common.search.embedding_search import EmbeddingSearch
 from consultant_bot.common.search.filter_search import FilterSearch
 from consultant_bot.common.search.products import Product, load_products
@@ -51,9 +56,10 @@ def build_search_products_tool(
 
         Args:
             query: A short, focused search query describing what the customer needs.
-            category: An optional exact category name to narrow the search.
+            category: An optional category name to narrow the search; ignored if no product
+                falls under it.
         """
-        hits = strategy.search(query, category=category, top_k=top_k)
+        hits = search_with_category_fallback(strategy, query, category, top_k)
         return format_hits(hits) or NO_HITS_MESSAGE, hits
 
     return search_products

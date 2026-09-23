@@ -54,3 +54,12 @@ def test_search_products_applies_category_filter() -> None:
     result = _invoke_tool(tool, "", category="اینستاگرام")
 
     assert [hit.product.id for hit in result.artifact] == [9177]
+
+
+def test_search_products_ignores_a_guessed_category_that_matches_nothing() -> None:
+    products = load_products(FIXTURE_PATH)
+    tool = build_search_products_tool(FilterSearch(products), top_k=5)
+
+    result = _invoke_tool(tool, "تلگرام", category="دسته‌ای که وجود ندارد")
+
+    assert [hit.product.id for hit in result.artifact] == [7569]

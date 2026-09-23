@@ -19,6 +19,21 @@ class SearchStrategy(Protocol):
     ) -> list[ProductHit]: ...
 
 
+def search_with_category_fallback(
+    strategy: SearchStrategy, query: str, category: str | None, top_k: int
+) -> list[ProductHit]:
+    """Searches within `category`, retrying across the whole catalog if that finds nothing.
+
+    Categories reaching a search are LLM guesses, not picks from the real category list, so a
+    guess that matches no category would otherwise turn a perfectly answerable query into "no
+    products found".
+    """
+    hits = strategy.search(query, category=category, top_k=top_k)
+    if category and not hits:
+        hits = strategy.search(query, category=None, top_k=top_k)
+    return hits
+
+
 def format_hits(hits: Sequence[ProductHit]) -> str:
     """One line per hit — name, price and link.
 

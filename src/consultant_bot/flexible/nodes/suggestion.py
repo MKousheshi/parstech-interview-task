@@ -22,7 +22,11 @@ from pydantic import BaseModel, Field
 from consultant_bot.common import config
 from consultant_bot.common.entities import ENTITY_FIELDS, Entities
 from consultant_bot.common.llm import build_chat_model
-from consultant_bot.common.search.base import SearchStrategy, format_hits
+from consultant_bot.common.search.base import (
+    SearchStrategy,
+    format_hits,
+    search_with_category_fallback,
+)
 from consultant_bot.flexible.state import State
 
 ENTITY_LABELS: dict[str, str] = {
@@ -96,7 +100,9 @@ def build_suggestion_node(
             ]
         )
 
-        raw_hits = strategy.search(search_query.query, category=search_query.category, top_k=top_k)
+        raw_hits = search_with_category_fallback(
+            strategy, search_query.query, search_query.category, top_k
+        )
         hits = [hit for hit in raw_hits if hit.score > threshold]
 
         if hits:
