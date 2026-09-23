@@ -1,13 +1,14 @@
-"""Turning a graph invocation's appended messages into front-end-ready reply text.
+"""Reading text out of conversation messages: front-end-ready replies and the latest user input.
 
 Used by the web UI (`webui.py`) to decide what to show: a single turn can append more than one AI
 message — the assistant's own reply, then the `analysis` and `suggestion` pair when the
-consultation fires — and all of them are part of the answer.
+consultation fires — and all of them are part of the answer. The rigid variant's nodes read the
+user's raw message with `latest_user_text`.
 """
 
 from collections.abc import Sequence
 
-from langchain_core.messages import AIMessage, BaseMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
 
 def message_text(message: BaseMessage) -> str:
@@ -31,3 +32,11 @@ def reply_texts(messages: Sequence[BaseMessage]) -> list[str]:
         for message in messages
         if isinstance(message, AIMessage) and (text := message_text(message))
     ]
+
+
+def latest_user_text(messages: Sequence[BaseMessage]) -> str:
+    """The text of the most recent user message, or "" if there is none."""
+    for message in reversed(messages):
+        if isinstance(message, HumanMessage):
+            return message_text(message)
+    return ""

@@ -1,6 +1,6 @@
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
-from consultant_bot.common.messages import reply_texts
+from consultant_bot.common.messages import latest_user_text, reply_texts
 
 
 def test_returns_every_ai_reply_in_order() -> None:
@@ -36,3 +36,18 @@ def test_reads_text_out_of_block_style_content() -> None:
     messages = [AIMessage(content=[{"type": "text", "text": "پاسخ"}, {"type": "other"}])]
 
     assert reply_texts(messages) == ["پاسخ"]
+
+
+def test_latest_user_text_is_the_last_human_message_trimmed() -> None:
+    messages = [
+        HumanMessage(content="اول"),
+        AIMessage(content="پاسخ"),
+        HumanMessage(content="  دوم  "),
+        AIMessage(content="پاسخ دوم"),
+    ]
+
+    assert latest_user_text(messages) == "دوم"
+
+
+def test_latest_user_text_is_empty_without_a_user_message() -> None:
+    assert latest_user_text([AIMessage(content="سلام")]) == ""
