@@ -31,7 +31,7 @@ src/consultant_bot/
     search/
       products.py             # loads + cleans products.json into Product records
       base.py                  # SearchStrategy protocol + ProductHit + shared helpers (product_text,
-                                # category_indices, search_with_category_fallback, format_hits)
+                                # category_indices, search_relevant, format_hits)
       text.py                   # Persian normalization + stopword-aware keyword tokenization
       registry.py               # build_strategy()/build_active_strategy(); embedding imported lazily
       filter_search.py          # Phase 1: keyword/substring + category filter

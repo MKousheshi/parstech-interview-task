@@ -34,7 +34,7 @@ from consultant_bot.common.search.base import (
     ProductHit,
     SearchStrategy,
     format_hits,
-    search_with_category_fallback,
+    search_relevant,
 )
 from consultant_bot.flexible.state import Node, State
 from consultant_bot.flexible.tools.search_products import NO_HITS_MESSAGE, SEARCH_PRODUCTS_TOOL_NAME
@@ -100,7 +100,6 @@ def build_suggestion_node(
     top_k: int,
     relevance_threshold: float | None = None,
 ) -> Node:
-    threshold = strategy.relevance_threshold if relevance_threshold is None else relevance_threshold
 
     def suggestion(state: State) -> dict[str, Any]:
         entities = state.get("entities") or Entities()
@@ -113,17 +112,18 @@ def build_suggestion_node(
             ]
         )
 
-        raw_hits = search_with_category_fallback(
-            strategy, search_query.query, search_query.category, top_k
+        hits = search_relevant(
+            strategy,
+            search_query.query,
+            search_query.category,
+            top_k,
+            min_score=relevance_threshold,
         )
-        hits = [hit for hit in raw_hits if hit.score > threshold]
         logger.info(
-            "suggestion query %r (category %r): %d of %d hit(s) cleared threshold %.2f",
+            "suggestion query %r (category %r): %d hit(s) cleared the relevance threshold",
             search_query.query,
             search_query.category,
             len(hits),
-            len(raw_hits),
-            threshold,
         )
 
         if hits:

@@ -1,4 +1,4 @@
-from consultant_bot.common.search.base import ProductHit, format_hits, search_with_category_fallback
+from consultant_bot.common.search.base import ProductHit, format_hits, search_relevant
 from consultant_bot.common.search.products import Product
 
 PRODUCT = Product(
@@ -48,7 +48,7 @@ class _CategoryAwareStrategy:
 def test_category_fallback_keeps_category_results_when_there_are_any() -> None:
     strategy = _CategoryAwareStrategy()
 
-    hits = search_with_category_fallback(strategy, "پیج", "اینستاگرام", top_k=5)
+    hits = search_relevant(strategy, "پیج", "اینستاگرام", top_k=5)
 
     assert [hit.product.id for hit in hits] == [1]
     assert strategy.categories_searched == ["اینستاگرام"]
@@ -57,7 +57,41 @@ def test_category_fallback_keeps_category_results_when_there_are_any() -> None:
 def test_category_fallback_retries_without_a_category_that_matches_nothing() -> None:
     strategy = _CategoryAwareStrategy()
 
-    hits = search_with_category_fallback(strategy, "پیج", "شبکه‌های اجتماعی", top_k=5)
+    hits = search_relevant(strategy, "پیج", "شبکه‌های اجتماعی", top_k=5)
 
     assert [hit.product.id for hit in hits] == [1]
     assert strategy.categories_searched == ["شبکه‌های اجتماعی", None]
+
+
+class _ScoredStrategy:
+    relevance_threshold = 0.3
+
+    def __init__(self, scores: list[float]) -> None:
+        self.scores = scores
+
+    def search(self, query: str, category: str | None = None, top_k: int = 5) -> list[ProductHit]:
+        return [ProductHit(product=PRODUCT, score=score) for score in self.scores]
+
+
+def test_hits_at_or_below_the_strategys_threshold_are_dropped() -> None:
+    hits = search_relevant(_ScoredStrategy([0.9, 0.3, 0.1]), "پیج", None, top_k=5)
+
+    assert [hit.score for hit in hits] == [0.9]
+
+
+def test_min_score_overrides_the_strategys_threshold() -> None:
+    hits = search_relevant(_ScoredStrategy([0.9, 0.3, 0.1]), "پیج", None, top_k=5, min_score=0.0)
+
+    assert [hit.score for hit in hits] == [0.9, 0.3, 0.1]
+
+
+def test_category_with_only_irrelevant_hits_falls_back_to_the_whole_catalog() -> None:
+    class _WeakInCategory(_ScoredStrategy):
+        def search(
+            self, query: str, category: str | None = None, top_k: int = 5
+        ) -> list[ProductHit]:
+            return [ProductHit(product=PRODUCT, score=0.1 if category else 0.9)]
+
+    hits = search_relevant(_WeakInCategory([]), "پیج", "اینستاگرام", top_k=5)
+
+    assert [hit.score for hit in hits] == [0.9]

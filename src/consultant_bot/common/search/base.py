@@ -47,18 +47,34 @@ def category_indices(products: Sequence[Product], category: str | None) -> list[
     ]
 
 
-def search_with_category_fallback(
-    strategy: SearchStrategy, query: str, category: str | None, top_k: int
+def search_relevant(
+    strategy: SearchStrategy,
+    query: str,
+    category: str | None,
+    top_k: int,
+    *,
+    min_score: float | None = None,
 ) -> list[ProductHit]:
-    """Searches within `category`, retrying across the whole catalog if that finds nothing.
+    """The hits that clear the relevance floor, searching within `category` first.
 
-    Categories reaching a search are LLM guesses, not picks from the real category list, so a
-    guess that matches no category would otherwise turn a perfectly answerable query into "no
+    The floor is `min_score`, or the strategy's own `relevance_threshold` when not given. Without
+    it, the similarity strategies return their `top_k` best matches however unrelated they are,
+    and an LLM shown five products for an off-catalog question will usually recommend one.
+
+    Categories reaching a search are LLM guesses, not picks from the real category list, so when
+    nothing relevant is found within `category` the search is retried across the whole catalog.
+    Otherwise a guess that matches no category would turn a perfectly answerable query into "no
     products found".
     """
-    hits = strategy.search(query, category=category, top_k=top_k)
+    floor = strategy.relevance_threshold if min_score is None else min_score
+
+    def relevant(searched_category: str | None) -> list[ProductHit]:
+        hits = strategy.search(query, category=searched_category, top_k=top_k)
+        return [hit for hit in hits if hit.score > floor]
+
+    hits = relevant(category)
     if category and not hits:
-        hits = strategy.search(query, category=None, top_k=top_k)
+        hits = relevant(None)
     return hits
 
 
