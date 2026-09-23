@@ -40,3 +40,16 @@ def test_api_key_is_hidden_from_the_settings_repr(monkeypatch: pytest.MonkeyPatc
     assert "sk-very-secret" not in repr(settings)
     assert settings.openai_api_key is not None
     assert settings.openai_api_key.get_secret_value() == "sk-very-secret"
+
+
+def test_log_level_is_case_insensitive(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CONSULTANT_BOT_LOG_LEVEL", "debug")
+
+    assert Settings().log_level == "DEBUG"
+
+
+def test_unknown_log_level_is_rejected_up_front(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CONSULTANT_BOT_LOG_LEVEL", "verbose")
+
+    with pytest.raises(ValidationError):
+        Settings()

@@ -3,8 +3,8 @@
 Everything is read by `pydantic-settings` from the real environment or a `.env` file at the project
 root (see `example.env` for the template) — anchored to the project, not the current directory, so
 the web UI finds its API key no matter where it's launched from. Values are validated up front: a
-typo in `CONSULTANT_BOT_SEARCH_STRATEGY` fails at startup with a clear message instead of a
-`KeyError` deep inside graph construction.
+typo in `CONSULTANT_BOT_SEARCH_STRATEGY` or `CONSULTANT_BOT_LOG_LEVEL` fails at startup with a clear
+message instead of an error deep inside graph construction or logging setup.
 
 Read settings through `get_settings()` at build/call time rather than at import time, so nothing
 is frozen into default arguments before the environment is final.
@@ -14,12 +14,14 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 SearchStrategyName = Literal["filter", "tfidf", "embedding"]
+
+LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 
 class Settings(BaseSettings):
@@ -46,7 +48,12 @@ class Settings(BaseSettings):
     products_path: Path = Field(
         default=PROJECT_ROOT / "products.json", validation_alias="CONSULTANT_BOT_PRODUCTS_PATH"
     )
-    log_level: str = Field(default="INFO", validation_alias="CONSULTANT_BOT_LOG_LEVEL")
+    log_level: LogLevel = Field(default="INFO", validation_alias="CONSULTANT_BOT_LOG_LEVEL")
+
+    @field_validator("log_level", mode="before")
+    @classmethod
+    def _uppercase_log_level(cls, value: object) -> object:
+        return value.upper() if isinstance(value, str) else value
 
 
 @lru_cache

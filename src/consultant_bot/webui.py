@@ -125,7 +125,7 @@ def main() -> None:
     parser.add_argument("--arch", choices=sorted(ARCHITECTURES), default="flexible")
     args = parser.parse_args()
     logging.basicConfig(
-        level=get_settings().log_level.upper(),
+        level=get_settings().log_level,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     build_demo(args.arch).launch()
