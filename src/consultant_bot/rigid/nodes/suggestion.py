@@ -43,7 +43,9 @@ def build_suggestion_node(
         entities = state.get("entities") or Entities()
         query = build_query(entities)
         hits = strategy.search(query, top_k=top_k)
-        logger.info("suggestion query %r: %d hit(s)", query, len(hits))
+        # The query is built from the user's answers, so it stays out of INFO logs.
+        logger.info("suggestion: %d hit(s)", len(hits))
+        logger.debug("suggestion query %r", query)
 
         if hits:
             message = as_reply(

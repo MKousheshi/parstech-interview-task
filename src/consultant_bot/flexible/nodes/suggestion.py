@@ -119,12 +119,8 @@ def build_suggestion_node(
             top_k,
             min_score=relevance_threshold,
         )
-        logger.info(
-            "suggestion query %r (category %r): %d hit(s) cleared the relevance threshold",
-            search_query.query,
-            search_query.category,
-            len(hits),
-        )
+        logger.info("suggestion: %d hit(s) cleared the relevance threshold", len(hits))
+        logger.debug("suggestion query %r (category %r)", search_query.query, search_query.category)
 
         if hits:
             message = as_reply(

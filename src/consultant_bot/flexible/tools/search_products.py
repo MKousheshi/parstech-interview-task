@@ -42,7 +42,9 @@ def build_search_products_tool(strategy: SearchStrategy, *, top_k: int) -> BaseT
                 falls under it.
         """
         hits = search_relevant(strategy, query, category, top_k)
-        logger.info("search_products(%r, category=%r): %d hit(s)", query, category, len(hits))
+        # The query is derived from what the user typed, so it stays out of INFO logs.
+        logger.info("search_products: %d hit(s)", len(hits))
+        logger.debug("search_products(%r, category=%r)", query, category)
         return format_hits(hits) or NO_HITS_MESSAGE, hits
 
     return search_products

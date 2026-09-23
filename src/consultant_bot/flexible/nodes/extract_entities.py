@@ -117,7 +117,9 @@ def build_extract_entities_node(
         }
         changed = bool(changes)
         if changed:
-            logger.info("entities updated: %s", changes)
+            # Field names only at INFO: the values are the user's own words.
+            logger.info("entities updated: %s", sorted(changes))
+            logger.debug("entity values: %s", changes)
 
         update: dict[str, Any] = {"entities": entities.model_copy(update=changes)}
         if extracted.wants_consultation:

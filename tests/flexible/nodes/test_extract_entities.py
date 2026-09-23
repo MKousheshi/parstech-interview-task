@@ -1,5 +1,7 @@
+import logging
 from typing import Any, cast
 
+import pytest
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 
 from consultant_bot.common.entities import Entities
@@ -177,3 +179,15 @@ def test_a_placeholder_string_is_read_as_no_value() -> None:
     )
 
     assert extracted == ExtractedEntities()
+
+
+def test_info_logs_name_the_changed_fields_but_not_their_values(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    node = build_extract_entities_node(ScriptedRunnable(ExtractedEntities(location="شیراز")))
+
+    with caplog.at_level(logging.INFO):
+        node(_state())
+
+    assert "location" in caplog.text
+    assert "شیراز" not in caplog.text
