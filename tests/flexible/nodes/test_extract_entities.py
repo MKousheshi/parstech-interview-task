@@ -1,6 +1,6 @@
 from typing import Any, cast
 
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 
 from consultant_bot.common.entities import Entities
 from consultant_bot.flexible.nodes.extract_entities import (
@@ -139,4 +139,33 @@ def test_consultation_done_stays_true_when_nothing_changes() -> None:
         )
     )
 
+    assert "consultation_done" not in update
+
+
+def test_prompt_shows_the_stored_values() -> None:
+    extractor = ScriptedRunnable(ExtractedEntities())
+    node = build_extract_entities_node(extractor)
+
+    node(_state(entities=Entities(business_type="کافه", location="تهران")))
+
+    [received] = extractor.inputs
+    assert isinstance(received[0], SystemMessage)
+    assert "کافه" in received[0].content
+    assert "تهران" in received[0].content
+
+
+def test_a_respelled_value_is_not_a_change_and_keeps_the_consultation_done() -> None:
+    # Arabic yeh and kaf, a ZWNJ where the stored value has none, extra spaces.
+    extractor = ScriptedRunnable(ExtractedEntities(business_type="  كافي\u200cشاپ "))
+    node = build_extract_entities_node(extractor)
+
+    update = node(
+        _state(
+            entities=Entities(business_type="کافی شاپ"),
+            consultation_requested=True,
+            consultation_done=True,
+        )
+    )
+
+    assert update["entities"].business_type == "کافی شاپ"
     assert "consultation_done" not in update

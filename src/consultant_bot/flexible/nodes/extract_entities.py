@@ -3,6 +3,14 @@
 Runs before the assistant replies so it always sees up-to-date entity state, including anything
 just corrected. See `docs/ARCHITECTURE_FLEXIBLE.md`'s `extract_entities` section for the merge
 rules this implements.
+
+Given older messages, the extractor returns answers the user gave turns ago, often reworded
+("کافی‌شاپ" for a stored "کافه"; seen with gpt-4o-mini even when told not to). Any change clears
+`consultation_done`, and `consultation_requested` stays set, so that rewording would re-run the
+whole analysis and suggestion on a turn that had nothing to do with them. Three guards stop it:
+the extractor only sees the latest user message and the assistant reply before it, the prompt
+shows the stored values and asks only for what that message states or corrects, and values that
+differ only in spacing or Arabic/Persian letter variants don't count as a change.
 """
 
 import logging
@@ -15,23 +23,30 @@ from langchain_core.runnables import Runnable
 from pydantic import Field
 
 from consultant_bot.common.entities import ENTITY_FIELDS, Entities
+from consultant_bot.common.search.text import normalize
 from consultant_bot.flexible.state import State
 
 logger = logging.getLogger(__name__)
 
-# How many recent messages to give the extractor, for pronoun/reference resolution and for
-# detecting an affirmative reply to a consultation offer made a turn or two ago.
-RECENT_MESSAGES_WINDOW = 6
+# The latest user message plus the assistant reply just before it: enough to resolve a short answer
+# to the assistant's question ("شیراز") or a "yes" to its consultation offer. Older messages are
+# deliberately left out, since the extractor would re-read answers stored turns ago.
+RECENT_MESSAGES_WINDOW = 2
 
 SYSTEM_PROMPT = """\
-از پیام‌های اخیر مکالمه، ۴ ویژگی زیر را در صورتی که کاربر صراحتاً و با اطمینان بیان کرده باشد \
-استخراج کن. اگر پاسخ کاربر مبهم یا نامشخص بود (مثلاً «نمی‌دانم» یا «مهم نیست»)، آن فیلد را خالی \
-(null) بگذار به‌جای ثبت یک مقدار نامطمئن:
+از آخرین پیام کاربر، ۴ ویژگی زیر را در صورتی که کاربر صراحتاً و با اطمینان بیان یا اصلاح کرده \
+باشد استخراج کن. پیام‌های قبلی فقط برای فهم ارجاع‌ها هستند (مثلاً پاسخ کوتاه «تهران» به سؤال دستیار \
+درباره شهر)؛ مقداری را که فقط در پیام‌های قبلی گفته شده دوباره برنگردان. اگر پاسخ کاربر مبهم یا \
+نامشخص بود (مثلاً «نمی‌دانم» یا «مهم نیست»)، آن فیلد را خالی (null) بگذار به‌جای ثبت یک مقدار \
+نامطمئن:
 
 - business_type: نوع کسب‌وکار
 - customer_type: نوع مشتریان، B2B یا B2C
 - location: موقعیت جغرافیایی
 - sales_channel: کانال فروش مجازی (وب‌سایت یا پیج)
+
+مقادیر ثبت‌شده تاکنون (فقط اگر آخرین پیام کاربر یکی از آن‌ها را تغییر داده، مقدار جدید را برگردان):
+{known_entities}
 
 همچنین wants_consultation را true کن اگر کاربر صراحتاً درخواست مشاوره کسب‌وکار کرده، یا در پاسخ \
 به پیشنهاد قبلی دستیار برای انجام مشاوره، پاسخ مثبت داده باشد.\
@@ -47,7 +62,7 @@ def build_default_extractor(llm: BaseChatModel) -> Runnable[Any, ExtractedEntiti
 
 
 def recent_context(messages: Sequence[BaseMessage]) -> list[BaseMessage]:
-    """The last `RECENT_MESSAGES_WINDOW` conversational messages — tool traffic excluded.
+    """The last `RECENT_MESSAGES_WINDOW` conversational messages, tool traffic excluded.
 
     The assistant's ReAct loop interleaves `AIMessage(tool_calls=...)`/`ToolMessage` pairs into the
     history, and a fixed-size window over the raw list can begin on a `ToolMessage` whose
@@ -65,20 +80,27 @@ def recent_context(messages: Sequence[BaseMessage]) -> list[BaseMessage]:
     return conversational[-RECENT_MESSAGES_WINDOW:]
 
 
+def _comparable(value: str | None) -> str:
+    """`value` with spacing and letter variants unified, for deciding whether it really changed."""
+    return " ".join(normalize(value or "").split())
+
+
 def build_extract_entities_node(
     extractor: Runnable[Any, ExtractedEntities],
 ) -> Callable[[State], dict[str, Any]]:
     def extract_entities(state: State) -> dict[str, Any]:
-        recent_messages = recent_context(state["messages"])
-        extracted = extractor.invoke([SystemMessage(content=SYSTEM_PROMPT), *recent_messages])
-
         entities = state.get("entities") or Entities()
+        prompt = SYSTEM_PROMPT.format(known_entities=entities.summary() or "(هنوز هیچ‌کدام)")
+        recent_messages = recent_context(state["messages"])
+        extracted = extractor.invoke([SystemMessage(content=prompt), *recent_messages])
+
         # A field the extractor left empty means "not mentioned (clearly) this turn", never
         # "clear it": only non-empty values that differ from what's stored are merged in.
         changes = {
             field: value
             for field in ENTITY_FIELDS
-            if (value := extracted.value(field)) and value != entities.value(field)
+            if (value := extracted.value(field))
+            and _comparable(value) != _comparable(entities.value(field))
         }
         changed = bool(changes)
         if changed:
