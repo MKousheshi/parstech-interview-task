@@ -13,7 +13,12 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 
-from consultant_bot.webui import turn_replies
+from consultant_bot.webui import (
+    ERROR_MESSAGE,
+    NO_REPLY_MESSAGE,
+    turn_replies,
+    user_facing_replies,
+)
 
 
 class _State(TypedDict):
@@ -68,3 +73,25 @@ def test_threads_are_isolated_from_each_other() -> None:
     replies = turn_replies(app, "thread-2", "سلام")
 
     assert replies == ["پاسخ دستیار", "تحلیل کسب‌وکار", "پیشنهاد محصول"]
+
+
+def _build_app_with(node: Any) -> Any:
+    graph = StateGraph(_State)
+    graph.add_node("reply", node)
+    graph.add_edge(START, "reply")
+    graph.add_edge("reply", END)
+    return graph.compile(checkpointer=MemorySaver())
+
+
+def test_a_failing_turn_shows_an_error_message_instead_of_raising() -> None:
+    def fail(_state: _State) -> dict[str, Any]:
+        raise TimeoutError("LLM request timed out")
+
+    assert user_facing_replies(_build_app_with(fail), "t", "سلام") == [ERROR_MESSAGE]
+
+
+def test_a_turn_with_no_visible_reply_says_so() -> None:
+    def silent(_state: _State) -> dict[str, Any]:
+        return {"messages": []}
+
+    assert user_facing_replies(_build_app_with(silent), "t", "سلام") == [NO_REPLY_MESSAGE]

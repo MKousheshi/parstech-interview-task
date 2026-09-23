@@ -5,6 +5,7 @@ just corrected. See `docs/ARCHITECTURE_FLEXIBLE.md`'s `extract_entities` section
 rules this implements.
 """
 
+import logging
 from collections.abc import Callable, Sequence
 from typing import Any
 
@@ -15,6 +16,8 @@ from pydantic import Field
 
 from consultant_bot.common.entities import ENTITY_FIELDS, Entities
 from consultant_bot.flexible.state import State
+
+logger = logging.getLogger(__name__)
 
 # How many recent messages to give the extractor, for pronoun/reference resolution and for
 # detecting an affirmative reply to a consultation offer made a turn or two ago.
@@ -78,6 +81,8 @@ def build_extract_entities_node(
             if (value := extracted.value(field)) and value != entities.value(field)
         }
         changed = bool(changes)
+        if changed:
+            logger.info("entities updated: %s", changes)
 
         update: dict[str, Any] = {"entities": entities.model_copy(update=changes)}
         if extracted.wants_consultation:

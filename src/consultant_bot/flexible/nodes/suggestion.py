@@ -11,6 +11,7 @@ explicitly told not to invent products and to say so honestly if none did.
 cleared the threshold — the consultation itself is still considered complete either way.
 """
 
+import logging
 from collections.abc import Callable
 from typing import Any
 
@@ -26,6 +27,8 @@ from consultant_bot.common.search.base import (
     search_with_category_fallback,
 )
 from consultant_bot.flexible.state import State
+
+logger = logging.getLogger(__name__)
 
 NO_RESULTS_MESSAGE = (
     "متأسفانه در حال حاضر محصول یا بسته مرتبطی در فروشگاه برای این نیاز پیدا نکردم."
@@ -78,6 +81,14 @@ def build_suggestion_node(
             strategy, search_query.query, search_query.category, top_k
         )
         hits = [hit for hit in raw_hits if hit.score > threshold]
+        logger.info(
+            "suggestion query %r (category %r): %d of %d hit(s) cleared threshold %.2f",
+            search_query.query,
+            search_query.category,
+            len(hits),
+            len(raw_hits),
+            threshold,
+        )
 
         if hits:
             message = formatting_llm.invoke(

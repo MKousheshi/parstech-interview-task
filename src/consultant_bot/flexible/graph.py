@@ -5,6 +5,8 @@ tool) `-> completion_check gate -> (analysis -> suggestion | END)`. See
 `docs/ARCHITECTURE_FLEXIBLE.md` for the full per-node behavioral spec.
 """
 
+import logging
+
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
@@ -22,9 +24,14 @@ from consultant_bot.flexible.nodes.extract_entities import (
 from consultant_bot.flexible.nodes.suggestion import build_query_formulator, build_suggestion_node
 from consultant_bot.flexible.state import State
 
+logger = logging.getLogger(__name__)
+
 
 def _route_after_assistant(state: State) -> str:
-    return "analysis" if completion_check(state) else END
+    if completion_check(state):
+        logger.info("consultation requested with all 4 entities known: running analysis")
+        return "analysis"
+    return END
 
 
 def build_graph(checkpointer: BaseCheckpointSaver | None = None) -> CompiledStateGraph:

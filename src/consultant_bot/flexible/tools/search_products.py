@@ -7,6 +7,8 @@ calls in a single step, where several writes to the same state key are rejected 
 `assistant` node instead folds every artifact from the turn into one `last_shown_products` update.
 """
 
+import logging
+
 from langchain_core.tools import BaseTool, tool
 
 from consultant_bot.common.search.base import (
@@ -15,6 +17,8 @@ from consultant_bot.common.search.base import (
     format_hits,
     search_with_category_fallback,
 )
+
+logger = logging.getLogger(__name__)
 
 SEARCH_PRODUCTS_TOOL_NAME = "search_products"
 
@@ -37,6 +41,7 @@ def build_search_products_tool(strategy: SearchStrategy, *, top_k: int) -> BaseT
                 falls under it.
         """
         hits = search_with_category_fallback(strategy, query, category, top_k)
+        logger.info("search_products(%r, category=%r): %d hit(s)", query, category, len(hits))
         return format_hits(hits) or NO_HITS_MESSAGE, hits
 
     return search_products

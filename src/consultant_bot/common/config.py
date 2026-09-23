@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     openai_base_url: str | None = None
     openai_model: str = "gpt-4o-mini"
     llm_temperature: float = Field(default=0.3, validation_alias="CONSULTANT_BOT_LLM_TEMPERATURE")
+    # Without a timeout, one stalled request hangs the user's turn indefinitely.
+    llm_timeout_seconds: float = Field(
+        default=60.0, gt=0, validation_alias="CONSULTANT_BOT_LLM_TIMEOUT_SECONDS"
+    )
+    llm_max_retries: int = Field(default=2, ge=0, validation_alias="CONSULTANT_BOT_LLM_MAX_RETRIES")
 
     # "filter" (Phase 1), "tfidf" (Phase 2) or "embedding" (Phase 3).
     search_strategy: SearchStrategyName = Field(
@@ -40,6 +45,7 @@ class Settings(BaseSettings):
     products_path: Path = Field(
         default=PROJECT_ROOT / "products.json", validation_alias="CONSULTANT_BOT_PRODUCTS_PATH"
     )
+    log_level: str = Field(default="INFO", validation_alias="CONSULTANT_BOT_LOG_LEVEL")
 
 
 @lru_cache

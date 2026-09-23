@@ -18,6 +18,8 @@ def build_chat_model() -> ChatOpenAI:
     kwargs: dict[str, Any] = {
         "model": settings.openai_model,
         "temperature": settings.llm_temperature,
+        "timeout": settings.llm_timeout_seconds,
+        "max_retries": settings.llm_max_retries,
     }
     if settings.openai_api_key:
         kwargs["api_key"] = settings.openai_api_key

@@ -11,6 +11,7 @@ the graph's own conversation state.
 """
 
 import argparse
+import logging
 import uuid
 
 import gradio as gr
@@ -20,6 +21,7 @@ from langgraph.graph.state import CompiledStateGraph
 
 from consultant_bot.architectures import ARCHITECTURES
 from consultant_bot.common.checkpoint import build_checkpointer
+from consultant_bot.common.config import get_settings
 from consultant_bot.common.messages import reply_texts
 
 WELCOME_MESSAGE = (
@@ -29,6 +31,10 @@ WELCOME_MESSAGE = (
 )
 
 NO_REPLY_MESSAGE = "متأسفانه پاسخی تولید نشد. لطفاً دوباره تلاش کنید."
+
+ERROR_MESSAGE = "متأسفانه در پردازش پیام خطایی رخ داد. لطفاً چند لحظه بعد دوباره تلاش کنید."
+
+logger = logging.getLogger(__name__)
 
 
 def turn_replies(app: CompiledStateGraph, thread_id: str, message: str) -> list[str]:
@@ -48,13 +54,25 @@ def turn_replies(app: CompiledStateGraph, thread_id: str, message: str) -> list[
     return reply_texts(result["messages"][previous_count:])
 
 
+def user_facing_replies(app: CompiledStateGraph, thread_id: str, message: str) -> list[str]:
+    """`turn_replies`, but never empty and never raising: what the chat window should show."""
+    try:
+        replies = turn_replies(app, thread_id, message)
+    except Exception:
+        # An LLM/API failure (timeout, rate limit, bad key) shouldn't surface as Gradio's generic
+        # error toast; log the details and tell the user in their own language.
+        logger.exception("turn failed for thread %s", thread_id)
+        return [ERROR_MESSAGE]
+    # A turn that somehow appended nothing would otherwise render as no reply at all, which reads
+    # as a hung UI; say so instead.
+    return replies or [NO_REPLY_MESSAGE]
+
+
 def build_demo(arch: str = "flexible") -> gr.Blocks:
     app = ARCHITECTURES[arch](build_checkpointer())
 
     def respond(message: str, history: list[dict[str, str]], thread_id: str) -> list[str]:
-        # A turn that somehow appended nothing would otherwise render as no reply at all, which
-        # reads as a hung UI; say so instead.
-        return turn_replies(app, thread_id, message) or [NO_REPLY_MESSAGE]
+        return user_facing_replies(app, thread_id, message)
 
     with gr.Blocks(title="دستیار مشاوره کسب‌وکار") as demo:
         thread_id = gr.State()
@@ -78,6 +96,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="consultant-bot-web")
     parser.add_argument("--arch", choices=sorted(ARCHITECTURES), default="flexible")
     args = parser.parse_args()
+    logging.basicConfig(
+        level=get_settings().log_level.upper(),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
     build_demo(args.arch).launch()
 
 
