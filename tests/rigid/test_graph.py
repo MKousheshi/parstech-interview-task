@@ -2,7 +2,7 @@ from typing import Any
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
-from langchain_core.runnables import RunnableConfig
+from langchain_core.runnables import Runnable, RunnableConfig
 
 from consultant_bot.architectures import ARCHITECTURES
 from consultant_bot.common.analysis import analysis_messages
@@ -118,3 +118,34 @@ def test_search_and_unclear_turns_end_after_one_reply() -> None:
     assert search_reply.startswith(RESULTS_HEADER.format(query="تلگرام"))
     assert chat.say("سلام") == [FALLBACK_MESSAGE]
     assert not chat.llm.was_called
+
+
+class _FailsOnce(Runnable[Any, Any]):
+    """An LLM whose first call times out and whose later calls succeed."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def invoke(self, input: Any, config: RunnableConfig | None = None, **kwargs: Any) -> Any:
+        self.calls += 1
+        if self.calls == 1:
+            raise TimeoutError("LLM request timed out")
+        return AIMessage(content="پاسخ")
+
+
+def test_a_consultation_that_failed_after_the_last_answer_can_be_retried() -> None:
+    chat = _Conversation("consultation", "consultation")
+    chat.app = assemble_graph(
+        chat.classifier,
+        _FailsOnce(),
+        FilterSearch(load_products(FIXTURE_PATH)),
+        top_k=5,
+        checkpointer=build_checkpointer(),
+    )
+    for answer in ["مشاوره", "کافه", "B2C", "تهران"]:
+        chat.say(answer)
+    with pytest.raises(TimeoutError):
+        chat.say("اینستاگرام")
+
+    assert chat.say("مشاوره می‌خوام") == ["پاسخ", "پاسخ"]
+    assert chat.state()["consultation_done"] is True

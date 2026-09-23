@@ -7,7 +7,7 @@ from consultant_bot.rigid.nodes.route_intent import (
     route_after_intent,
 )
 from consultant_bot.rigid.state import Intent, State
-from tests.support import ScriptedRunnable
+from tests.support import COMPLETE_ENTITIES, ScriptedRunnable
 
 
 def test_classifies_only_the_latest_user_message() -> None:
@@ -44,6 +44,12 @@ def test_route_after_intent(intent: Intent, consultation_done: bool, expected: s
     state: State = {"messages": [], "intent": intent, "consultation_done": consultation_done}
 
     assert route_after_intent(state) == expected
+
+
+def test_consultation_with_all_entities_but_not_done_retries_the_analysis() -> None:
+    state: State = {"messages": [], "intent": "consultation", "entities": COMPLETE_ENTITIES}
+
+    assert route_after_intent(state) == "analysis"
 
 
 def test_route_after_intent_falls_back_without_a_label() -> None:

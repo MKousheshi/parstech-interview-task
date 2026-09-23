@@ -3,6 +3,11 @@
 Runs only when no entity field is pending. Picks exactly one of `search` / `consultation` /
 `unclear` and writes it to `intent`; `route_after_intent` — a pure function on the conditional
 edge — turns that label into the next node.
+
+A consultation request normally goes to `ask_entity`. The exception is a consultation whose 4
+answers were all captured but whose analysis or suggestion call then failed (a timeout, a rate
+limit): the entities are saved but `consultation_done` never got set. There is no field left to
+ask for, so the request goes straight to `analysis` and the consultation is retried.
 """
 
 import logging
@@ -13,6 +18,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import Runnable
 from pydantic import BaseModel, Field
 
+from consultant_bot.common.entities import Entities
 from consultant_bot.common.messages import latest_user_text
 from consultant_bot.rigid.state import Intent, Node, State
 
@@ -56,6 +62,10 @@ def route_after_intent(state: State) -> str:
         case "search":
             return "product_search"
         case "consultation":
-            return "idle_reply" if state.get("consultation_done") else "ask_entity"
+            if state.get("consultation_done"):
+                return "idle_reply"
+            if (state.get("entities") or Entities()).is_complete():
+                return "analysis"
+            return "ask_entity"
         case _:
             return "fallback"

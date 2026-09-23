@@ -93,7 +93,9 @@ flowchart TD
     route -->|unclear| fallback[fallback: canned reply]
     route -->|consultation| gate2{consultation_done?}
     gate2 -->|yes| idle_reply[canned: already completed]
-    gate2 -->|no| ask
+    gate2 -->|no| gate3{all 4 entities set?}
+    gate3 -->|no| ask
+    gate3 -->|yes| analysis
     ask --> ENDa([END])
     psearch --> ENDb([END])
     fallback --> ENDc([END])
@@ -101,7 +103,7 @@ flowchart TD
     suggestion --> ENDe([END])
 ```
 
-- **`route_intent`** — runs only when no field is pending. A single structured-output LLM call (`with_structured_output` over a model with one `Literal["search", "consultation", "unclear"]` field, the same pattern as the flexible variant's extractor) on the latest user message only. The node writes the label to `intent`; a pure routing function on the conditional edge reads it. No tool use, no free-form judgment beyond picking one label.
+- **`route_intent`** — runs only when no field is pending. A single structured-output LLM call (`with_structured_output` over a model with one `Literal["search", "consultation", "unclear"]` field, the same pattern as the flexible variant's extractor) on the latest user message only. The node writes the label to `intent`; a pure routing function on the conditional edge reads it. No tool use, no free-form judgment beyond picking one label. A `consultation` label normally leads to `ask_entity`. The exception is when all 4 entities are already set but `consultation_done` isn't: the 4th answer was captured, then the analysis or suggestion call failed (a timeout, a rate limit). There's no field left to ask for, so the route goes straight to `analysis` and retries the consultation. Without this, `ask_entity` would have nothing to ask and every later consultation request would fail.
 - **`capture_entity`** — zero LLM calls: takes the raw reply text, trims it, and stores it verbatim as the value of `awaiting_field`, then clears `awaiting_field`. No confidence check, no re-asking on an ambiguous answer — whatever was typed is the value. The one exception falls out of the entity model rather than a check: an empty reply leaves the field unset, so `ask_entity` asks for it again.
 - **`ask_entity`** — zero LLM calls: looks up the first unset field in the fixed order (`business_type`, `customer_type`, `location`, `sales_channel`) and returns a fixed template question for it, setting `awaiting_field` to that field's name.
 - **`product_search`** — zero LLM calls: passes the raw user message straight to the active `SearchStrategy.search()` as the query (no decomposition of compound requests, no query rewriting for follow-ups) and template-formats the top-`k` hits (name, price, link — the shared `format_hits` lines under a fixed header) into the reply, or a fixed "nothing found" message when there are none. `last_search_results` is updated for display purposes only — nothing downstream reads it back to resolve a later "what's the price of it?", since that would require the kind of context-dependent interpretation this design deliberately doesn't do outside the entity-capture flow.

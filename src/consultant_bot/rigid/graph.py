@@ -2,8 +2,8 @@
 
 `START -> (awaiting_field set? capture_entity : route_intent)`; `capture_entity -> (all 4 entities
 known? analysis -> suggestion : ask_entity)`; `route_intent -> product_search | fallback |
-(consultation_done? idle_reply : ask_entity)`; every other node ends the turn. See
-`docs/ARCHITECTURE_RIGID.md` for the full per-node behavioral spec.
+(consultation_done? idle_reply : all 4 known? analysis : ask_entity)`; every other node ends the
+turn. See `docs/ARCHITECTURE_RIGID.md` for the full per-node behavioral spec.
 """
 
 import logging
@@ -72,7 +72,7 @@ def assemble_graph(
     graph.add_conditional_edges(
         "route_intent",
         route_after_intent,
-        ["product_search", "fallback", "idle_reply", "ask_entity"],
+        ["product_search", "fallback", "idle_reply", "ask_entity", "analysis"],
     )
     graph.add_edge("analysis", "suggestion")
     for node in ["ask_entity", "product_search", "fallback", "idle_reply", "suggestion"]:
