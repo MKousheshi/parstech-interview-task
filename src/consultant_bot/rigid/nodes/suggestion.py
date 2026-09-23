@@ -10,7 +10,6 @@ empty result skips the formatting call for a fixed message.
 """
 
 import logging
-from collections.abc import Callable
 from typing import Any
 
 from langchain_core.language_models import LanguageModelLike
@@ -18,7 +17,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from consultant_bot.common.entities import Entities
 from consultant_bot.common.search.base import SearchStrategy, format_hits
-from consultant_bot.rigid.state import State
+from consultant_bot.rigid.state import Node, State
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +37,7 @@ def build_query(entities: Entities) -> str:
 
 def build_suggestion_node(
     strategy: SearchStrategy, formatting_llm: LanguageModelLike, *, top_k: int
-) -> Callable[[State], dict[str, Any]]:
+) -> Node:
     def suggestion(state: State) -> dict[str, Any]:
         entities = state.get("entities") or Entities()
         query = build_query(entities)

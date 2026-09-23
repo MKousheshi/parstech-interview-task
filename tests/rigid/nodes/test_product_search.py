@@ -1,6 +1,3 @@
-from collections.abc import Callable
-from typing import Any
-
 from langchain_core.messages import HumanMessage
 
 from consultant_bot.common.search.filter_search import FilterSearch
@@ -10,11 +7,11 @@ from consultant_bot.rigid.nodes.product_search import (
     RESULTS_HEADER,
     build_product_search_node,
 )
-from consultant_bot.rigid.state import State
+from consultant_bot.rigid.state import Node
 from tests.support import FIXTURE_PATH
 
 
-def _node(top_k: int = 5) -> Callable[[State], dict[str, Any]]:
+def _node(top_k: int = 5) -> Node:
     return build_product_search_node(FilterSearch(load_products(FIXTURE_PATH)), top_k=top_k)
 
 

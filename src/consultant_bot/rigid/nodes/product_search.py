@@ -5,23 +5,20 @@ Zero LLM calls: no query rewriting, no decomposition of compound requests, no ca
 follow-up question.
 """
 
-from collections.abc import Callable
 from typing import Any
 
 from langchain_core.messages import AIMessage
 
 from consultant_bot.common.messages import latest_user_text
 from consultant_bot.common.search.base import SearchStrategy, format_hits
-from consultant_bot.rigid.state import State
+from consultant_bot.rigid.state import Node, State
 
 RESULTS_HEADER = "نتایج جست‌وجو برای «{query}»:"
 
 NO_RESULTS_MESSAGE = "محصولی مطابق با «{query}» در فروشگاه پیدا نشد."
 
 
-def build_product_search_node(
-    strategy: SearchStrategy, *, top_k: int
-) -> Callable[[State], dict[str, Any]]:
+def build_product_search_node(strategy: SearchStrategy, *, top_k: int) -> Node:
     def product_search(state: State) -> dict[str, Any]:
         query = latest_user_text(state["messages"])
         hits = strategy.search(query, top_k=top_k)

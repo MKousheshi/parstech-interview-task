@@ -6,7 +6,6 @@ edge — turns that label into the next node.
 """
 
 import logging
-from collections.abc import Callable
 from typing import Any
 
 from langchain_core.language_models import BaseChatModel
@@ -15,7 +14,7 @@ from langchain_core.runnables import Runnable
 from pydantic import BaseModel, Field
 
 from consultant_bot.common.messages import latest_user_text
-from consultant_bot.rigid.state import Intent, State
+from consultant_bot.rigid.state import Intent, Node, State
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +38,7 @@ def build_default_classifier(llm: BaseChatModel) -> Runnable[Any, IntentLabel]:
 
 def build_route_intent_node(
     classifier: Runnable[Any, IntentLabel],
-) -> Callable[[State], dict[str, Any]]:
+) -> Node:
     def route_intent(state: State) -> dict[str, Any]:
         text = latest_user_text(state["messages"])
         label = classifier.invoke(
