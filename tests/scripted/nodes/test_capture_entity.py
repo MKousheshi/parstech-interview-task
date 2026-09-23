@@ -32,9 +32,8 @@ def test_leaves_other_fields_untouched() -> None:
     )
 
 
-def test_an_off_topic_reply_is_stored_verbatim() -> None:
-    # The scripted design's documented limitation: a pending field swallows whatever comes next.
-    reply = "راستش می‌خوام محصولات رو جست‌وجو کنم"
+def test_the_whole_reply_is_stored_without_extracting_the_value() -> None:
+    reply = "ما تو تهران هستیم"
 
     result = capture_entity(
         {"messages": [HumanMessage(content=reply)], "awaiting_field": "location"}

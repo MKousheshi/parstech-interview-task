@@ -1,9 +1,9 @@
 """Builds the scripted (flow-based) architecture's StateGraph.
 
-`START -> (awaiting_field set? capture_entity : route_intent)`; `capture_entity -> (all 4 entities
-known? analysis -> suggestion : ask_entity)`; `route_intent -> product_search | fallback |
-(consultation_done? idle_reply : all 4 known? analysis : ask_entity)`; every other node ends the
-turn. See `docs/ARCHITECTURE_SCRIPTED.md` for the full per-node behavioral spec.
+`START -> route_intent`, which routes every turn: `answer -> capture_entity -> (all 4 entities
+known? analysis -> suggestion : ask_entity)`; `search -> product_search`; `unclear -> fallback`;
+`consultation -> (consultation_done? idle_reply : all 4 known? analysis : ask_entity)`. Every other
+node ends the turn. See `docs/ARCHITECTURE_SCRIPTED.md` for the full per-node behavioral spec.
 """
 
 import logging
@@ -37,10 +37,6 @@ from consultant_bot.scripted.state import State
 logger = logging.getLogger(__name__)
 
 
-def _route_start(state: State) -> str:
-    return "capture_entity" if state.get("awaiting_field") else "route_intent"
-
-
 def _route_after_capture(state: State) -> str:
     if (state.get("entities") or Entities()).is_complete():
         logger.info("all 4 entities captured: running analysis")
@@ -67,12 +63,12 @@ def assemble_graph(
     graph.add_node("analysis", build_analysis_node(llm))
     graph.add_node("suggestion", build_suggestion_node(strategy, llm, top_k=top_k))
 
-    graph.add_conditional_edges(START, _route_start, ["capture_entity", "route_intent"])
+    graph.add_edge(START, "route_intent")
     graph.add_conditional_edges("capture_entity", _route_after_capture, ["analysis", "ask_entity"])
     graph.add_conditional_edges(
         "route_intent",
         route_after_intent,
-        ["product_search", "fallback", "idle_reply", "ask_entity", "analysis"],
+        ["capture_entity", "product_search", "fallback", "idle_reply", "ask_entity", "analysis"],
     )
     graph.add_edge("analysis", "suggestion")
     for node in ["ask_entity", "product_search", "fallback", "idle_reply", "suggestion"]:

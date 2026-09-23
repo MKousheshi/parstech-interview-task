@@ -2,7 +2,7 @@
 
 Zero LLM calls: no query rewriting, no decomposition of compound requests, no category guess.
 `last_search_results` is written for display only — nothing downstream reads it back to answer a
-follow-up question.
+follow-up question. A search mid-consultation ends with the pending entity question again.
 """
 
 from typing import Any
@@ -11,6 +11,7 @@ from langchain_core.messages import AIMessage
 
 from consultant_bot.common.messages import latest_user_text
 from consultant_bot.common.search.base import SearchStrategy, format_hits
+from consultant_bot.scripted.nodes.ask_entity import with_pending_reminder
 from consultant_bot.scripted.state import Node, State
 
 RESULTS_HEADER = "نتایج جست‌وجو برای «{query}»:"
@@ -26,6 +27,9 @@ def build_product_search_node(strategy: SearchStrategy, *, top_k: int) -> Node:
             text = f"{RESULTS_HEADER.format(query=query)}\n{format_hits(hits)}"
         else:
             text = NO_RESULTS_MESSAGE.format(query=query)
-        return {"messages": [AIMessage(content=text)], "last_search_results": hits}
+        return {
+            "messages": [AIMessage(content=with_pending_reminder(text, state))],
+            "last_search_results": hits,
+        }
 
     return product_search

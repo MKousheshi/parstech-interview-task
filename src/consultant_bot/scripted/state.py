@@ -11,7 +11,7 @@ from consultant_bot.common.search.base import ProductHit
 # The 4 entity field names, as a type: `awaiting_field` can only ever name one of them.
 EntityField = Literal["business_type", "customer_type", "location", "sales_channel"]
 
-Intent = Literal["search", "consultation", "unclear"]
+Intent = Literal["answer", "search", "consultation", "unclear"]
 
 
 class State(TypedDict):
@@ -19,7 +19,8 @@ class State(TypedDict):
     # first writes it, which is why nodes read them with `state.get(...)`.
     messages: Annotated[list[BaseMessage], add_messages]
     entities: NotRequired[Entities]
-    # The entity the next user message will be stored into verbatim, skipping intent routing.
+    # The entity whose question was asked last; a message `route_intent` labels `answer` is stored
+    # into it verbatim.
     awaiting_field: NotRequired[EntityField | None]
     # `route_intent`'s label for this turn, read by its conditional edge.
     intent: NotRequired[Intent | None]

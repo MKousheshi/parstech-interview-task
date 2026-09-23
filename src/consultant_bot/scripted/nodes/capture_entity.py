@@ -1,8 +1,9 @@
 """capture_entity node: stores the user's reply verbatim as the value of the pending field.
 
-Zero LLM calls and no validation: whatever was typed (trimmed) becomes the value, even if it was
-clearly meant as something else — the scripted design's documented limitation. An empty reply leaves
-the field unset, so `ask_entity` asks for it again.
+Reached only when `route_intent` labeled the message an `answer` to the pending question. Zero LLM
+calls and no extraction: the whole reply (trimmed) becomes the value, so "ما تو تهران هستیم" is
+stored as is rather than as "تهران". An empty reply leaves the field unset, so `ask_entity` asks for
+it again.
 """
 
 from typing import Any

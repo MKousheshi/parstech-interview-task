@@ -11,14 +11,13 @@ from consultant_bot.common.entities import Entities
 from consultant_bot.common.messages import reply_texts
 from consultant_bot.common.search.filter_search import FilterSearch
 from consultant_bot.common.search.products import load_products
-from consultant_bot.scripted.graph import (
-    _route_after_capture,
-    _route_start,
-    assemble_graph,
-    build_graph,
+from consultant_bot.scripted.graph import _route_after_capture, assemble_graph, build_graph
+from consultant_bot.scripted.nodes.ask_entity import PENDING_REMINDER, QUESTIONS
+from consultant_bot.scripted.nodes.canned import (
+    FALLBACK_MESSAGE,
+    IDLE_MESSAGE,
+    PENDING_FALLBACK_MESSAGE,
 )
-from consultant_bot.scripted.nodes.ask_entity import QUESTIONS
-from consultant_bot.scripted.nodes.canned import FALLBACK_MESSAGE, IDLE_MESSAGE
 from consultant_bot.scripted.nodes.product_search import RESULTS_HEADER
 from consultant_bot.scripted.nodes.route_intent import IntentLabel
 from consultant_bot.scripted.state import Intent
@@ -45,12 +44,6 @@ def test_build_graph_wires_all_expected_nodes(monkeypatch: pytest.MonkeyPatch) -
 
 def test_scripted_is_registered_as_an_architecture() -> None:
     assert ARCHITECTURES["scripted"] is build_graph
-
-
-def test_route_start_captures_while_a_field_is_pending() -> None:
-    assert _route_start({"messages": [], "awaiting_field": "location"}) == "capture_entity"
-    assert _route_start({"messages": [], "awaiting_field": None}) == "route_intent"
-    assert _route_start({"messages": []}) == "route_intent"
 
 
 def test_route_after_capture_runs_analysis_only_once_complete() -> None:
@@ -84,7 +77,7 @@ class _Conversation:
 
 
 def test_full_consultation_asks_in_order_then_runs_analysis_and_suggestion() -> None:
-    chat = _Conversation("consultation", "consultation")
+    chat = _Conversation("consultation", "answer", "answer", "answer", "answer", "consultation")
 
     assert chat.say("می‌خوام مشاوره بگیرم") == [QUESTIONS["business_type"]]
     assert chat.say("کافه") == [QUESTIONS["customer_type"]]
@@ -95,20 +88,36 @@ def test_full_consultation_asks_in_order_then_runs_analysis_and_suggestion() -> 
     state = chat.state()
     assert state["entities"] == COMPLETE_ENTITIES
     assert state["consultation_done"] is True
-    # Answers skip classification: only the opening message was classified.
-    assert len(chat.classifier.inputs) == 1
+    # Every turn is classified, answers included.
+    assert len(chat.classifier.inputs) == 5
     assert chat.llm.inputs[0] == analysis_messages(COMPLETE_ENTITIES)
 
     assert chat.say("یک مشاوره دیگه می‌خوام") == [IDLE_MESSAGE]
 
 
-def test_a_pending_field_swallows_an_off_topic_reply() -> None:
-    chat = _Conversation("consultation")
+def test_a_search_mid_consultation_keeps_the_question_pending() -> None:
+    chat = _Conversation("consultation", "search", "answer")
 
     chat.say("مشاوره")
-    assert chat.say("محصولات تلگرام رو نشونم بده") == [QUESTIONS["customer_type"]]
+    [search_reply] = chat.say("تلگرام")
 
-    assert chat.state()["entities"].business_type == "محصولات تلگرام رو نشونم بده"
+    assert search_reply.startswith(RESULTS_HEADER.format(query="تلگرام"))
+    assert search_reply.endswith(PENDING_REMINDER.format(question=QUESTIONS["business_type"]))
+    assert chat.state()["awaiting_field"] == "business_type"
+    assert not chat.state().get("entities")
+
+    assert chat.say("کافه") == [QUESTIONS["customer_type"]]
+    assert chat.state()["entities"].business_type == "کافه"
+
+
+def test_an_unclear_reply_mid_consultation_repeats_the_question() -> None:
+    chat = _Conversation("consultation", "unclear", "consultation")
+
+    chat.say("مشاوره")
+    expected = PENDING_FALLBACK_MESSAGE.format(question=QUESTIONS["business_type"])
+    assert chat.say("سلام") == [expected]
+    # Asking for a consultation again while one is underway repeats the open question.
+    assert chat.say("مشاوره می‌خوام") == [QUESTIONS["business_type"]]
 
 
 def test_search_and_unclear_turns_end_after_one_reply() -> None:
@@ -134,7 +143,7 @@ class _FailsOnce(Runnable[Any, Any]):
 
 
 def test_a_consultation_that_failed_after_the_last_answer_can_be_retried() -> None:
-    chat = _Conversation("consultation", "consultation")
+    chat = _Conversation("consultation", "answer", "answer", "answer", "answer", "consultation")
     chat.app = assemble_graph(
         chat.classifier,
         _FailsOnce(),

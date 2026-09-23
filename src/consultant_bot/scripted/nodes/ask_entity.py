@@ -1,7 +1,8 @@
 """ask_entity node: the fixed question for the next unset entity, in the spec's literal order.
 
-Zero LLM calls. Sets `awaiting_field`, so the user's next message skips intent routing and is
-stored verbatim by `capture_entity`.
+Zero LLM calls. Sets `awaiting_field`, so `route_intent` can recognize the user's next message
+as the answer, which `capture_entity` then stores verbatim. Asking again while that question is
+still open (a consultation request mid-consultation) just repeats it.
 """
 
 from typing import Any
@@ -22,6 +23,18 @@ QUESTIONS: dict[EntityField, str] = {
         "فروش مجازی شما بیشتر از چه کانالی انجام می‌شود؟ (مثلاً وب‌سایت یا پیج اینستاگرام)"
     ),
 }
+
+
+PENDING_REMINDER = "در ضمن، هنوز منتظر پاسخ این سؤال هستم: {question}"
+
+
+def with_pending_reminder(text: str, state: State) -> str:
+    """`text`, followed by the still-unanswered entity question if there is one, so a detour
+    (a search mid-consultation) leads back to where the consultation left off."""
+    field = state.get("awaiting_field")
+    if field is None:
+        return text
+    return f"{text}\n\n{PENDING_REMINDER.format(question=QUESTIONS[field])}"
 
 
 def next_missing_field(entities: Entities) -> EntityField | None:
