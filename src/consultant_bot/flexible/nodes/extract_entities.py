@@ -20,7 +20,7 @@ from typing import Any
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import Runnable
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from consultant_bot.common.entities import ENTITY_FIELDS, Entities
 from consultant_bot.common.search.text import normalize
@@ -54,8 +54,20 @@ SYSTEM_PROMPT = """\
 """
 
 
+# What the model sometimes writes as text when it means "no value". Read literally, "null" would be
+# stored as the user's business type and count as a change that re-runs the consultation.
+_PLACEHOLDER_VALUES = frozenset({"null", "none", "n/a", "unknown", "نامشخص", "ندارد"})
+
+
 class ExtractedEntities(Entities):
     wants_consultation: bool = Field(default=False)
+
+    @field_validator(*ENTITY_FIELDS, mode="before")
+    @classmethod
+    def _placeholder_means_unset(cls, value: object) -> object:
+        if isinstance(value, str) and value.strip().lower() in _PLACEHOLDER_VALUES:
+            return None
+        return value
 
 
 def build_default_extractor(llm: BaseChatModel) -> Runnable[Any, ExtractedEntities]:

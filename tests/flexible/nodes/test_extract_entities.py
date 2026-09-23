@@ -169,3 +169,11 @@ def test_a_respelled_value_is_not_a_change_and_keeps_the_consultation_done() -> 
 
     assert update["entities"].business_type == "کافی شاپ"
     assert "consultation_done" not in update
+
+
+def test_a_placeholder_string_is_read_as_no_value() -> None:
+    extracted = ExtractedEntities.model_validate(
+        {"business_type": "null", "customer_type": " None ", "location": "نامشخص"}
+    )
+
+    assert extracted == ExtractedEntities()
