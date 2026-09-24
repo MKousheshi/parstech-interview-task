@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     # "filter" (Phase 1), "tfidf" (Phase 2), "embedding" (Phase 3) or "hybrid" (TF-IDF and
     # embedding scores blended).
     search_strategy: SearchStrategyName = Field(
-        default="filter", validation_alias="CONSULTANT_BOT_SEARCH_STRATEGY"
+        default="hybrid", validation_alias="CONSULTANT_BOT_SEARCH_STRATEGY"
     )
     search_top_k: int = Field(default=5, ge=1, validation_alias="CONSULTANT_BOT_SEARCH_TOP_K")
     products_path: Path = Field(

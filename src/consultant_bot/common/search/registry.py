@@ -2,7 +2,7 @@
 
 `EmbeddingSearch` is imported only when asked for (directly or inside the hybrid strategy):
 importing it pulls in `sentence-transformers` and `torch`, which would otherwise slow every
-startup even with the default filter strategy.
+startup with the `filter` or `tfidf` strategy.
 """
 
 from consultant_bot.common.config import SearchStrategyName, get_settings

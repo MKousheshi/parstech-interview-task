@@ -11,6 +11,7 @@ from consultant_bot.common.entities import Entities
 from consultant_bot.common.messages import reply_texts
 from consultant_bot.common.search.filter_search import FilterSearch
 from consultant_bot.common.search.products import load_products
+from consultant_bot.scripted import graph
 from consultant_bot.scripted.graph import _route_after_capture, assemble_graph, build_graph
 from consultant_bot.scripted.nodes.ask_entity import PENDING_REMINDER, QUESTIONS
 from consultant_bot.scripted.nodes.canned import (
@@ -27,6 +28,8 @@ from tests.support import COMPLETE_ENTITIES, FIXTURE_PATH, ScriptedRunnable
 def test_build_graph_wires_all_expected_nodes(monkeypatch: pytest.MonkeyPatch) -> None:
     # A dummy key is enough: ChatOpenAI checks one is present but never calls the API here.
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-not-a-real-key")
+    # The default hybrid strategy would load the embedding model; wiring doesn't depend on it.
+    monkeypatch.setattr(graph, "build_active_strategy", lambda: FilterSearch(load_products()))
 
     app = build_graph()
 

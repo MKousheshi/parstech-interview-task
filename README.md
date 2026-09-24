@@ -102,13 +102,14 @@ Select one with `CONSULTANT_BOT_SEARCH_STRATEGY` in `.env`:
 
 | Strategy | How it works |
 |---|---|
-| `filter` (default) | Phase 1: keyword/substring match over name, description and category, plus an explicit category filter |
+| `filter` | Phase 1: keyword/substring match over name, description and category, plus an explicit category filter |
 | `tfidf` | Phase 2: scikit-learn TF-IDF with cosine similarity, category folded into the text |
 | `embedding` | Phase 3: local `sentence-transformers` model (`paraphrase-multilingual-MiniLM-L12-v2`), no API calls |
-| `hybrid` | an equal-weight sum of the TF-IDF and embedding scores |
+| `hybrid` (default) | an equal-weight sum of the TF-IDF and embedding scores |
 
 The `embedding` and `hybrid` strategies download the embedding model (about 118 MB) from Hugging
-Face on first use. To compare all strategies side by side on a set of realistic Persian queries:
+Face on first use, so the first run with the default settings takes a while; set `filter` or
+`tfidf` to skip it. To compare all strategies side by side on a set of realistic Persian queries:
 
 ```bash
 uv run python scripts/compare_search.py
@@ -126,7 +127,7 @@ All settings are read from the environment or from `.env` at the repo root. See
 | `OPENAI_API_KEY` | (required) | OpenAI or OpenAI-compatible API key |
 | `OPENAI_BASE_URL` | OpenAI's endpoint | point at a compatible gateway |
 | `OPENAI_MODEL` | `gpt-4o-mini` | chat model |
-| `CONSULTANT_BOT_SEARCH_STRATEGY` | `filter` | `filter`, `tfidf`, `embedding` or `hybrid` |
+| `CONSULTANT_BOT_SEARCH_STRATEGY` | `hybrid` | `filter`, `tfidf`, `embedding` or `hybrid` |
 | `CONSULTANT_BOT_SEARCH_TOP_K` | `5` | results per search |
 | `CONSULTANT_BOT_LLM_TEMPERATURE` | `0.3` | |
 | `CONSULTANT_BOT_LLM_TIMEOUT_SECONDS` | `60` | per LLM request |
