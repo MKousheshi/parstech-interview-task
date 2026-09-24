@@ -27,6 +27,7 @@ Package management is via `uv`.
 
 ## Repository map
 
+- `README.md` — user-facing overview: setup, running, the two architectures and four search strategies compared, configuration table. Update it when commands, settings or behavior it describes change.
 - `docs/TASK_SPEC.md` — faithful English rendering of the original (Persian) task description. Treat as close to immutable; don't edit it to reflect scope decisions.
 - `docs/CLARIFICATIONS.md` — open questions and observations about the task/data that haven't been resolved into a decision yet. Items move here first, then get resolved into `docs/DECISIONS.md` and removed from this file.
 - `docs/DECISIONS.md` — the living log of scope/architecture decisions, dated and with rationale + alternatives considered. **This is the source of truth for how the assistant should be built.** Read it before implementing anything — it already answers most "how should this work" questions.
